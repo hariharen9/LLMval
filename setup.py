@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="llmval",
-    version="1.0.1",
+    version="1.0.2",
     author="Hariharen",
     url="https://hariharen.site",
     packages=find_packages(),

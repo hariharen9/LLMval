@@ -931,14 +931,14 @@
       <div class="text-sm font-medium" style="color:var(--fg)">Developer Index</div>
       <p class="mt-1">Rankings update with live OpenRouter pricing & Artificial Analysis benchmarks.</p>
       <div class="mt-2 text-[11.5px]">Created by <a href="https://hariharen.site" target="_blank" rel="noopener" class="font-medium underline underline-offset-2 hover:text-[var(--fg)] transition" style="color:var(--acc)">Hariharen</a></div>
-      <span class="chip mt-3 inline-block">v1.0.1</span>
+      <span class="chip mt-3 inline-block">v1.0.2</span>
     </div>
   </aside>
 
   <!-- NAV -->
   <header class="sticky top-0 z-30 glass border-x-0 border-t-0 lg:pl-60">
-    <div class="max-w-[1320px] mx-auto px-5 h-14 flex items-center gap-3">
-      <div class="flex items-center gap-2.5 lg:hidden">
+    <div class="max-w-[1320px] mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center gap-2.5 sm:gap-3">
+      <div class="flex items-center gap-2.5 lg:hidden mr-1 sm:mr-2">
         <span class="logo"><svg viewBox="0 0 16 16">
             <rect x="2" y="8" width="3" height="6" rx="1.2" />
             <rect x="6.5" y="5" width="3" height="9" rx="1.2" />
@@ -946,33 +946,33 @@
           </svg></span>
         <span class="wm">LLM<span>val</span></span>
       </div>
-      <div class="hidden md:flex items-center gap-2 ml-3 text-xs glass rounded-full px-3 py-1.5"
+      <div class="hidden md:flex items-center gap-2 ml-1 text-xs glass rounded-full px-3.5 py-1.5"
         style="color:var(--mut)">
         <span class="w-2 h-2 rounded-full pulse" style="background:var(--acc2)"></span><span
           id="status">Connecting…</span>
       </div>
       <div class="flex-1"></div>
       <button id="cmdk" aria-label="Search models"
-        class="glass rounded-xl h-9 px-3 text-[13px] flex items-center gap-2.5 hover:bg-[var(--row)] transition"
+        class="glass rounded-xl h-9 sm:h-10 px-3 sm:px-3.5 text-[13px] flex items-center gap-2 sm:gap-2.5 hover:bg-[var(--row)] transition shrink-0"
         style="color:var(--mut)"><svg viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor"
           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="7" />
           <path d="M20 20l-3.5-3.5" />
-        </svg><span class="hidden md:inline pr-6">Search models</span><kbd class="hidden md:inline">⌘K</kbd></button>
+        </svg><span class="hidden md:inline pr-4 sm:pr-6">Search models</span><kbd class="hidden md:inline">⌘K</kbd></button>
       <button id="refresh" aria-label="Refresh data"
-        class="btn-acc rounded-xl h-9 px-3.5 text-[13px] font-medium flex items-center gap-2 transition"><svg
+        class="btn-acc rounded-xl h-9 sm:h-10 px-3.5 sm:px-4 text-[13px] font-medium flex items-center gap-2 transition shrink-0"><svg
           viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
           stroke-linejoin="round">
           <path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7" />
         </svg><span class="hidden sm:inline">Refresh</span></button>
       <button id="csv" aria-label="Export CSV"
-        class="glass rounded-xl h-9 px-3.5 text-[13px] flex items-center gap-2 hover:bg-[var(--row)] transition"><svg
+        class="glass rounded-xl h-9 sm:h-10 px-3.5 sm:px-4 text-[13px] flex items-center gap-2 hover:bg-[var(--row)] transition shrink-0"><svg
           viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
           stroke-linejoin="round">
           <path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14" />
         </svg><span class="hidden sm:inline">Export CSV</span></button>
       <button id="theme" aria-label="Toggle theme"
-        class="glass rounded-xl w-9 h-9 grid place-items-center hover:bg-[var(--row)] transition overflow-hidden"><span
+        class="glass rounded-xl w-9 h-9 sm:w-10 sm:h-10 grid place-items-center hover:bg-[var(--row)] transition overflow-hidden shrink-0"><span
           class="sun"><svg viewBox="0 0 24 24" class="ic" fill="none" stroke="currentColor" stroke-width="1.8"
             stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="4" />
@@ -986,12 +986,12 @@
   </header>
 
   <div class="lg:pl-60">
-    <nav id="mnav" class="nav lg:hidden flex gap-1 overflow-x-auto px-3 py-2"></nav>
+    <nav id="mnav" class="nav lg:hidden flex gap-1.5 overflow-x-auto px-4 py-3"></nav>
 
     <!-- ALERT / WARNING CONTAINER -->
-    <div id="warnings" class="max-w-[1320px] mx-auto px-5 pt-4 empty:hidden"></div>
+    <div id="warnings" class="max-w-[1320px] mx-auto px-4 sm:px-6 pt-4 empty:hidden"></div>
 
-    <main id="view-board" class="view on max-w-[1320px] mx-auto px-5 pb-24">
+    <main id="view-board" class="view on max-w-[1320px] mx-auto px-4 sm:px-6 pb-24">
       <!-- HERO -->
       <section class="pt-16 pb-10">
         <h1 class="hero-title text-6xl sm:text-8xl grad pb-2 rise">The smartest model<br>for your money.</h1>

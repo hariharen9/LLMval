@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import re
+import ssl
 import sys
 import threading
 import time
@@ -112,17 +113,52 @@ def save_json(path: Path, data):
         pass
 
 
+def get_ssl_context(fallback_unverified: bool = False) -> ssl.SSLContext:
+    """Creates a robust SSL context, with certifi fallback or unverified fallback for macOS/proxies."""
+    if fallback_unverified:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+
+    # Try certifi if installed in the environment
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        pass
+
+    # Standard default SSL context
+    try:
+        return ssl.create_default_context()
+    except Exception:
+        ctx = ssl._create_unverified_context() if hasattr(ssl, "_create_unverified_context") else ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+
+
 def http_get(url: str, headers: dict = None, timeout: int = 25):
-    """Performs an HTTP GET request with standard headers and returns decoded JSON."""
+    """Performs an HTTP GET request with standard headers and returns decoded JSON, with SSL verification fallback."""
     default_headers = {
-        "User-Agent": "llmval/1.0.1",
+        "User-Agent": "llmval/1.0.2",
         "Accept": "application/json",
     }
     if headers:
         default_headers.update(headers)
     req = urllib.request.Request(url, headers=default_headers)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    
+    ctx = get_ssl_context(fallback_unverified=False)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:
+        err_msg = str(exc).lower()
+        if "certificate" in err_msg or "ssl" in err_msg or "verify failed" in err_msg:
+            fallback_ctx = get_ssl_context(fallback_unverified=True)
+            with urllib.request.urlopen(req, timeout=timeout, context=fallback_ctx) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        raise
 
 
 def normalize_slug(text: str) -> str:
