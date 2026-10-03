@@ -13,6 +13,18 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+# Enable UTF-8 encoding on Windows terminal consoles
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 
 def load_dotenv():
     """Loads environment variables from .env file with standard library only."""
@@ -102,7 +114,7 @@ def save_json(path: Path, data):
 def http_get(url: str, headers: dict = None, timeout: int = 25):
     """Performs an HTTP GET request with standard headers and returns decoded JSON."""
     default_headers = {
-        "User-Agent": "llmval/3.0.0",
+        "User-Agent": "llmval/1.0.0",
         "Accept": "application/json",
     }
     if headers:
@@ -533,6 +545,119 @@ class RequestHandler(BaseHTTPRequestHandler):
         pass
 
 
+def print_terminal_dashboard(data: dict, port: int, max_age_days: int = 90):
+    """Renders a sleek, professional terminal CLI summary of today's best models."""
+    now_ts = time.time()
+    rows = data.get("rows", [])
+
+    # Filter: scored models released in last 90 days, excluding batch variants by default
+    filtered = []
+    for r in rows:
+        score = r.get("coding") or r.get("intel")
+        if score is None:
+            continue
+        created = r.get("created")
+        age_days = (now_ts - created) / 86400 if created else 9999
+        if age_days > max_age_days:
+            continue
+        if r.get("variant") == "batch" or r.get("id", "").endswith(":batch"):
+            continue
+        blended = r.get("blended", 0)
+        value = (score * score) / blended if (blended > 0 and not r.get("free")) else (score * score * 1000 if r.get("free") else 0)
+        filtered.append({
+            "id": r.get("id"),
+            "name": r.get("name"),
+            "creator": r.get("creator") or "Unknown",
+            "score": score,
+            "coding": r.get("coding"),
+            "intel": r.get("intel"),
+            "pin": r.get("pin", 0),
+            "pout": r.get("pout", 0),
+            "blended": blended,
+            "free": r.get("free", False),
+            "value": value,
+            "tps": r.get("tps"),
+            "ttft": r.get("ttft"),
+            "ctx": r.get("ctx"),
+        })
+
+    # Find Top Picks
+    paid = [r for r in filtered if not r["free"]]
+    best_value = max(paid, key=lambda x: x["value"]) if paid else None
+    
+    budget_models = [r for r in paid if r["blended"] <= 2.5]
+    smartest_budget = max(budget_models, key=lambda x: x["score"]) if budget_models else (max(paid, key=lambda x: x["score"]) if paid else None)
+    
+    speed_models = [r for r in filtered if r["tps"]]
+    fastest = max(speed_models, key=lambda x: x["tps"]) if speed_models else None
+    
+    free_models = [r for r in filtered if r["free"]]
+    best_free = max(free_models, key=lambda x: x["score"]) if free_models else None
+
+    # Top 5 ranked
+    top_5 = sorted(paid, key=lambda x: x["value"], reverse=True)[:5] if paid else []
+
+    # ANSI Colors
+    CYAN = "\033[1;36m"
+    GREEN = "\033[1;32m"
+    YELLOW = "\033[1;33m"
+    MAGENTA = "\033[1;35m"
+    WHITE = "\033[1;37m"
+    GRAY = "\033[90m"
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+
+    print("\n" + f"{CYAN}╔══════════════════════════════════════════════════════════════════════════════════╗{RESET}")
+    print(f"{CYAN}║{RESET}  {BOLD}{WHITE}LLMVAL{RESET} · {YELLOW}Developer & LLM Intelligence / Pricing Index{RESET}                        {CYAN}║{RESET}")
+    print(f"{CYAN}║{RESET}  {GRAY}Created by Hariharen{RESET}                                    {CYAN}║{RESET}")
+    print(f"{CYAN}╚══════════════════════════════════════════════════════════════════════════════════╝{RESET}")
+    
+    or_age = data.get("or_age")
+    or_str = "live" if or_age is None else (f"{int(or_age/60)}m ago" if or_age < 3600 else f"{round(or_age/3600,1)}h ago")
+    aa_state = "AA live" if data.get("live_bench") else "seed snapshot"
+    
+    print(f" {GRAY}Feeds:{RESET} OpenRouter ({or_str}) · {aa_state} · {GRAY}Window:{RESET} Last {max_age_days} days · {GRAY}Tracked:{RESET} {data.get('total', 0)} models ({data.get('scored', 0)} scored)")
+    print(f" {GRAY}Web UI:{RESET} {GREEN}http://localhost:{port}{RESET}  {GRAY}(Interactive Leaderboard, Compare & Calculator){RESET}\n")
+
+    print(f" {BOLD}{WHITE}TODAY'S RECOMMENDED PICKS (LAST {max_age_days} DAYS):{RESET}")
+    print(f" ─" * 40)
+    
+    if best_value:
+        b_price = f"${best_value['blended']:.2f}/1M" if best_value['blended'] >= 0.05 else f"${best_value['blended']:.3f}/1M"
+        print(f"  {YELLOW}🏆 BEST VALUE PICK{RESET}       : {BOLD}{WHITE}{best_value['name']}{RESET} ({best_value['creator']})")
+        print(f"     {GRAY}Score:{RESET} {GREEN}{best_value['score']:.1f}{RESET}  {GRAY}Blended:{RESET} {b_price}  {GRAY}Value Index:{RESET} {BOLD}{int(best_value['value']):,}{RESET}")
+
+    if smartest_budget:
+        s_price = f"${smartest_budget['blended']:.2f}/1M" if smartest_budget['blended'] >= 0.05 else f"${smartest_budget['blended']:.3f}/1M"
+        print(f"  {MAGENTA}🧠 SMARTEST IN BUDGET (<$2.50){RESET}: {BOLD}{WHITE}{smartest_budget['name']}{RESET} ({smartest_budget['creator']})")
+        print(f"     {GRAY}Score:{RESET} {GREEN}{smartest_budget['score']:.1f}{RESET}  {GRAY}Blended:{RESET} {s_price}")
+
+    if fastest:
+        ttft_str = f"{fastest['ttft']:.2f}s" if fastest.get("ttft") else "—"
+        print(f"  {CYAN}⚡ FASTEST GENERATION{RESET}    : {BOLD}{WHITE}{fastest['name']}{RESET}")
+        print(f"     {GRAY}Throughput:{RESET} {GREEN}{int(fastest['tps'])} tok/s{RESET}  {GRAY}TTFT:{RESET} {ttft_str}")
+
+    if best_free:
+        print(f"  {GREEN}🎁 BEST FREE MODEL{RESET}       : {BOLD}{WHITE}{best_free['name']}{RESET}")
+        print(f"     {GRAY}Score:{RESET} {GREEN}{best_free['score']:.1f}{RESET}  {GRAY}Price:{RESET} Free ($0.00)")
+
+    print(f" ─" * 40)
+    
+    if top_5:
+        print(f"\n {BOLD}{WHITE}TOP 5 VALUE LEADERBOARD:{RESET}")
+        header = f"  {GRAY}#   {'Model':<34} {'Lab':<14} {'Score':<7} {'Blended':<10} {'Value':<8}{RESET}"
+        print(header)
+        print(f"  {GRAY}────────────────────────────────────────────────────────────────────────────{RESET}")
+        for idx, m in enumerate(top_5, 1):
+            name_disp = m['name'][:32] + ".." if len(m['name']) > 34 else m['name']
+            lab_disp = m['creator'][:12] + ".." if len(m['creator']) > 14 else m['creator']
+            price_disp = f"${m['blended']:.2f}" if m['blended'] >= 0.05 else f"${m['blended']:.3f}"
+            val_disp = f"{int(m['value']):,}"
+            print(f"  {YELLOW if idx==1 else WHITE}{idx:<3}{RESET} {name_disp:<34} {GRAY}{lab_disp:<14}{RESET} {GREEN}{m['score']:<7.1f}{RESET} {WHITE}{price_disp:<10}{RESET} {BOLD}{val_disp:<8}{RESET}")
+
+    print(f"\n {GRAY}Press {WHITE}Ctrl+C{GRAY} in terminal to shutdown.{RESET}\n")
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="LLMVal - LLM Intelligence, Coding & Price Dashboard")
     parser.add_argument("-p", "--port", type=int, default=DEFAULT_PORT, help=f"Port to bind to (default: {DEFAULT_PORT})")
@@ -548,10 +673,9 @@ def main():
     if args.api_key:
         os.environ["AA_API_KEY"] = args.api_key
 
-    print("=" * 60)
-    print(f" LLMVal running at http://localhost:{port}")
-    print("=" * 60)
-    print(" Press Ctrl+C in terminal to stop.")
+    # Pre-fetch dataset and print rich CLI dashboard
+    data = get_data(force=False)
+    print_terminal_dashboard(data, port, max_age_days=90)
 
     if not args.no_browser and not os.environ.get("NO_BROWSER", "").lower() in ("1", "true"):
         threading.Timer(0.8, lambda: webbrowser.open(f"http://localhost:{port}")).start()
@@ -566,3 +690,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

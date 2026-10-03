@@ -39,3 +39,5 @@ benchmarks.json
 .idea/
 .DS_Store
 Thumbs.db
+
+/old-base-scripts/

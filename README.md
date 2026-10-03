@@ -124,7 +124,12 @@ llmval/
 └── benchmarks.example.json # Example benchmark overrides
 ```
 
+## 👨‍💻 Creator
+
+Created by **[Hariharen](https://hariharen.site)**.
+
 ---
 
 ## 📄 License
 MIT License.
+

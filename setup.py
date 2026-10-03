@@ -2,7 +2,9 @@ from setuptools import setup, find_packages
 
 setup(
     name="llmval",
-    version="3.0.0",
+    version="1.0.0",
+    author="Hariharen",
+    url="https://hariharen.site",
     packages=find_packages(),
     package_data={
         "llmval": ["web/*", "web/**/*"],

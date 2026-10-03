@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "llmval"
-version = "3.0.0"
+version = "1.0.0"
 description = "Live OpenRouter LLM prices + Artificial Analysis intelligence & coding benchmarks dashboard"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
 authors = [
-    { name = "Developer" }
+    { name = "Hariharen", email = "contact@hariharen.site" }
 ]
 keywords = ["llm", "openrouter", "artificial-analysis", "benchmarks", "coding", "pricing", "dashboard"]
 classifiers = [
@@ -20,6 +20,10 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = []
+
+[project.urls]
+Homepage = "https://hariharen.site"
+"Creator Website" = "https://hariharen.site"
 
 [project.scripts]
 llmval = "llmval.app:main"
