@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "llmval"
-version = "1.0.0"
+version = "1.0.1"
 description = "Live OpenRouter LLM prices + Artificial Analysis intelligence & coding benchmarks dashboard"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -32,4 +32,4 @@ llmval = "llmval.app:main"
 packages = ["llmval"]
 
 [tool.setuptools.package-data]
-llmval = ["web/*", "web/**/*"]
+llmval = ["web/*", "web/**/*", "data/*", "data/**/*"]

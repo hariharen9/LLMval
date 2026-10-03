@@ -30,8 +30,7 @@ ENV/
 # Project caches and local overrides
 cache.json
 history.json
-aliases.json
-benchmarks.json
+./benchmarks.json
 *.csv
 
 # IDE & OS files

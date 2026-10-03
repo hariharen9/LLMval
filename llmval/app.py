@@ -59,6 +59,7 @@ AA_KEY = os.environ.get("AA_API_KEY", "")
 DATA_DIR = Path(os.environ.get("LLMVAL_DATA_DIR", Path.cwd()))
 CACHE_FILE = DATA_DIR / "cache.json"
 BENCHMARKS_FILE = DATA_DIR / "benchmarks.json"
+PKG_BENCHMARKS_FILE = Path(__file__).parent / "data" / "benchmarks.json"
 
 WEB_DIR = Path(__file__).parent / "web"
 INDEX_HTML = WEB_DIR / "index.html"
@@ -114,7 +115,7 @@ def save_json(path: Path, data):
 def http_get(url: str, headers: dict = None, timeout: int = 25):
     """Performs an HTTP GET request with standard headers and returns decoded JSON."""
     default_headers = {
-        "User-Agent": "llmval/1.0.0",
+        "User-Agent": "llmval/1.0.1",
         "Accept": "application/json",
     }
     if headers:
@@ -175,8 +176,29 @@ def normalize_benchmark_item(item: dict) -> dict:
     if not isinstance(item, dict):
         return None
 
-    if "coding" in item and "intel" in item and isinstance(item.get("creator"), str):
-        return item
+    # If it's already a pre-parsed or cached item
+    if "evaluations" not in item:
+        creator_name = extract_creator_name(item.get("model_creator") or item.get("creator"))
+        return {
+            "name": item.get("name", ""),
+            "slug": item.get("slug", ""),
+            "creator": creator_name,
+            "release_date": item.get("release_date") or "",
+            "coding": item.get("coding"),
+            "intel": item.get("intel"),
+            "agentic": item.get("agentic"),
+            "math": item.get("math"),
+            "livecodebench": item.get("livecodebench"),
+            "terminalbench": item.get("terminalbench"),
+            "scicode": item.get("scicode"),
+            "gpqa": item.get("gpqa"),
+            "hle": item.get("hle"),
+            "ifbench": item.get("ifbench"),
+            "aime": item.get("aime"),
+            "tps": item.get("tps"),
+            "ttft": item.get("ttft"),
+            "ttfa": item.get("ttfa"),
+        }
 
     evals = item.get("evaluations") or {}
     
@@ -265,6 +287,8 @@ def find_matching_benchmark(base_slug: str, model_name: str, index: dict, aliase
 def get_benchmarks_data(force: bool, aa_key: str, warns: list) -> tuple:
     """Gets benchmarks from disk file or fetches from Artificial Analysis (1-day limit)."""
     bench_file_data = load_json(BENCHMARKS_FILE, None)
+    if not bench_file_data and PKG_BENCHMARKS_FILE.exists():
+        bench_file_data = load_json(PKG_BENCHMARKS_FILE, None)
     now = time.time()
     
     file_age = 1e12
@@ -607,10 +631,16 @@ def print_terminal_dashboard(data: dict, port: int, max_age_days: int = 90):
     RESET = "\033[0m"
     BOLD = "\033[1m"
 
-    print("\n" + f"{CYAN}╔══════════════════════════════════════════════════════════════════════════════════╗{RESET}")
-    print(f"{CYAN}║{RESET}  {BOLD}{WHITE}LLMVAL{RESET} · {YELLOW}Developer & LLM Intelligence / Pricing Index{RESET}                        {CYAN}║{RESET}")
-    print(f"{CYAN}║{RESET}  {GRAY}Created by Hariharen{RESET}                                    {CYAN}║{RESET}")
-    print(f"{CYAN}╚══════════════════════════════════════════════════════════════════════════════════╝{RESET}")
+    box_w = 76
+    t1_plain = "LLMVAL · Developer & LLM Intelligence / Pricing Index"
+    p1 = max(0, box_w - 2 - len(t1_plain))
+    t2_plain = "Created by Hariharen"
+    p2 = max(0, box_w - 2 - len(t2_plain))
+
+    print("\n" + f"{CYAN}╔{'═' * box_w}╗{RESET}")
+    print(f"{CYAN}║{RESET}  {BOLD}{WHITE}LLMVAL{RESET} · {YELLOW}Developer & LLM Intelligence / Pricing Index{RESET}{' ' * p1}{CYAN}║{RESET}")
+    print(f"{CYAN}║{RESET}  {GRAY}Created by Hariharen{RESET}{' ' * p2}{CYAN}║{RESET}")
+    print(f"{CYAN}╚{'═' * box_w}╝{RESET}")
     
     or_age = data.get("or_age")
     or_str = "live" if or_age is None else (f"{int(or_age/60)}m ago" if or_age < 3600 else f"{round(or_age/3600,1)}h ago")
