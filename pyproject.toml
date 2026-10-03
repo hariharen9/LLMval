@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "best-model-today"
+name = "llmval"
 version = "3.0.0"
 description = "Live OpenRouter LLM prices + Artificial Analysis intelligence & coding benchmarks dashboard"
 readme = "README.md"
@@ -12,7 +12,7 @@ license = { text = "MIT" }
 authors = [
     { name = "Developer" }
 ]
-keywords = ["llm", "openrouter", "artificial-analysis", "benchmarks", "pricing", "dashboard"]
+keywords = ["llm", "openrouter", "artificial-analysis", "benchmarks", "coding", "pricing", "dashboard"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -22,8 +22,7 @@ classifiers = [
 dependencies = []
 
 [project.scripts]
-best-model-today = "best_model_today.app:main"
-best_model_today = "best_model_today.app:main"
+llmval = "llmval.app:main"
 
 [tool.setuptools]
-packages = ["best_model_today"]
+packages = ["llmval"]

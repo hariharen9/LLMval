@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Best Model Today v3 (Coding Edition): Comprehensive LLM intelligence, coding benchmarks & live pricing."""
+"""LLMVal: Comprehensive LLM intelligence, coding benchmarks & live pricing dashboard."""
 
 import argparse
 import json
@@ -44,7 +44,7 @@ load_dotenv()
 DEFAULT_PORT = int(os.environ.get("PORT", 8000))
 AA_KEY = os.environ.get("AA_API_KEY", "")
 
-DATA_DIR = Path(os.environ.get("BEST_MODEL_DATA_DIR", Path.cwd()))
+DATA_DIR = Path(os.environ.get("LLMVAL_DATA_DIR", Path.cwd()))
 CACHE_FILE = DATA_DIR / "cache.json"
 BENCHMARKS_FILE = DATA_DIR / "benchmarks.json"
 
@@ -99,7 +99,7 @@ def save_json(path: Path, data):
 def http_get(url: str, headers: dict = None, timeout: int = 25):
     """Performs an HTTP GET request with standard headers and returns decoded JSON."""
     default_headers = {
-        "User-Agent": "best-model-today-v3/3.0.0",
+        "User-Agent": "llmval/3.0.0",
         "Accept": "application/json",
     }
     if headers:
@@ -492,7 +492,7 @@ HTML_PAGE = r"""<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Best Model Today · Coding & Intelligence Leaderboard</title>
+  <title>LLMVal · Intelligence, Coding & Price Leaderboard</title>
   <style>
     :root {
       --bg: #f8fafc;
@@ -1243,7 +1243,7 @@ HTML_PAGE = r"""<!doctype html>
       const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = `best_models_${new Date().toISOString().slice(0,10)}.csv`;
+      link.download = `llmval_models_${new Date().toISOString().slice(0,10)}.csv`;
       link.click();
     }
 
@@ -1290,7 +1290,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Best Model Today - LLM Coding Intelligence & Price Dashboard")
+    parser = argparse.ArgumentParser(description="LLMVal - LLM Intelligence, Coding & Price Dashboard")
     parser.add_argument("-p", "--port", type=int, default=DEFAULT_PORT, help=f"Port to bind to (default: {DEFAULT_PORT})")
     parser.add_argument("--no-browser", action="store_true", help="Don't open the browser automatically")
     parser.add_argument("--api-key", type=str, default=None, help="Artificial Analysis API key override")
@@ -1305,7 +1305,7 @@ def main():
         os.environ["AA_API_KEY"] = args.api_key
 
     print("=" * 60)
-    print(f" Best Model Today (Coding Edition) running at http://localhost:{port}")
+    print(f" LLMVal running at http://localhost:{port}")
     print("=" * 60)
     print(" Press Ctrl+C in terminal to stop.")
 

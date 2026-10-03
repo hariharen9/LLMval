@@ -1,4 +1,4 @@
-# Best Model Today 🚀
+# LLMVal 🚀
 
 A clean, elegant dashboard for discovering the smartest, highest-value LLMs across OpenRouter, ranked against live [Artificial Analysis](https://artificialanalysis.ai) benchmark evaluations (General Intelligence, Coding, Agentic, and Speed).
 
@@ -27,6 +27,7 @@ A clean, elegant dashboard for discovering the smartest, highest-value LLMs acro
   - 🧠 **Smartest in Budget**: Highest scoring model under your price ceiling.
   - ⚡ **Fastest Generation**: Top throughput model passing your quality threshold.
   - 🎁 **Best Free Model**: Top-scoring 100% free model.
+- **Batch API Toggle**: Optional toggle to include 50%-discounted asynchronous batch endpoints.
 - **Quota-Protected Disk Caching**: OpenRouter prices cache for 30 minutes; Artificial Analysis benchmarks cache for 24 hours into `benchmarks.json`.
 - **Zero External Dependencies**: Powered strictly by Python's standard library.
 
@@ -47,9 +48,7 @@ pip install -e .
 
 Once installed, simply run anywhere from your terminal:
 ```bash
-best-model-today
-# or
-best_model_today
+llmval
 ```
 
 ---
@@ -61,20 +60,23 @@ best_model_today
 python main.py
 
 # Or as a module:
-python -m best_model_today
+python -m llmval
 ```
 Your default browser will automatically open to `http://localhost:8000`.
 
-### 2. Options & Flags
+---
+
+## ⚙️ Options & Flags
+
 ```bash
 # Custom port
-python main.py --port 9000
+llmval --port 9000
 
 # Headless / server mode (do not open browser automatically)
-python main.py --no-browser
+llmval --no-browser
 
 # Custom Artificial Analysis API Key
-python main.py --api-key your_api_key_here
+llmval --api-key your_api_key_here
 ```
 
 Environment variables are also supported:
@@ -96,7 +98,7 @@ If an OpenRouter model slug doesn't automatically match an Artificial Analysis e
 ```
 
 ### 2. Manual Benchmarks (`benchmarks.json`)
-You can supply your own intelligence score overrides for any OpenRouter slug:
+You can supply your own score overrides for any OpenRouter slug:
 ```json
 {
   "custom/my-fine-tuned-model": 48.5
@@ -108,8 +110,8 @@ You can supply your own intelligence score overrides for any OpenRouter slug:
 ## 📁 Project Structure
 
 ```
-best_model_today/
-├── best_model_today/
+llmval/
+├── llmval/
 │   ├── __init__.py
 │   ├── __main__.py
 │   └── app.py            # Core engine, API fetchers & Web UI
@@ -117,6 +119,7 @@ best_model_today/
 ├── pyproject.toml        # Package & metadata definition
 ├── requirements.txt      # (Standard library only)
 ├── .gitignore            # Ignores cache files & bytecode
+├── .env                  # API keys and server configuration
 ├── aliases.example.json  # Example alias mapping
 └── benchmarks.example.json # Example benchmark overrides
 ```
