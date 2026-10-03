@@ -26,3 +26,6 @@ llmval = "llmval.app:main"
 
 [tool.setuptools]
 packages = ["llmval"]
+
+[tool.setuptools.package-data]
+llmval = ["web/*", "web/**/*"]
