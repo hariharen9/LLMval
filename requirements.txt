@@ -1,0 +1,2 @@
+# Best Model Today requires only the Python Standard Library (Python 3.8+).
+# No external pip packages are required to run the dashboard.

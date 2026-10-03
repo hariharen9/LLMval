@@ -1,0 +1,41 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Project caches and local overrides
+cache.json
+history.json
+aliases.json
+benchmarks.json
+*.csv
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

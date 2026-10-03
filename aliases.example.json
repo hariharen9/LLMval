@@ -1,0 +1,5 @@
+{
+  "anthropic/claude-sonnet-5.5": "claude-sonnet-5-5",
+  "openai/gpt-6-luna": "gpt-6-luna",
+  "meta-llama/llama-3.3-70b-instruct": "llama-3-3-70b-instruct"
+}
