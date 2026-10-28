@@ -435,6 +435,163 @@
       background: var(--bg);
     }
 
+    /* --- Modern Tooltip Popover & Icon System --- */
+    .tip-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      vertical-align: middle;
+    }
+
+    .tip-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      color: var(--mut);
+      transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+      cursor: pointer;
+      background: transparent;
+      border: 1px solid transparent;
+      padding: 0;
+      outline: none;
+    }
+
+    .tip-btn:hover,
+    .tip-wrap:focus-within .tip-btn {
+      color: var(--fg);
+      background: var(--row);
+      border-color: var(--line);
+    }
+
+    .tip-btn svg {
+      width: 13.5px;
+      height: 13.5px;
+    }
+
+    .tip-pop {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      width: 280px;
+      max-width: min(320px, calc(100vw - 32px));
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: var(--bg);
+      backdrop-filter: blur(28px) saturate(1.8);
+      -webkit-backdrop-filter: blur(28px) saturate(1.8);
+      border: 1px solid var(--line);
+      box-shadow: 0 20px 45px -15px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--fg);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+      z-index: 100;
+      text-align: left;
+    }
+
+    .tip-wrap:hover .tip-pop,
+    .tip-wrap:focus-within .tip-pop {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .tip-pop::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 5px;
+      border-style: solid;
+      border-color: var(--line) transparent transparent transparent;
+    }
+
+    /* --- Interactive Chart System --- */
+    #chart-container {
+      position: relative;
+    }
+
+    .chart-tooltip {
+      position: absolute;
+      width: 290px;
+      pointer-events: none;
+      z-index: 50;
+      transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+      background: var(--bg);
+      backdrop-filter: blur(24px) saturate(1.8);
+      -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    }
+
+    .chart-dot {
+      cursor: pointer;
+      transition: r 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), fill-opacity 0.2s, stroke-width 0.2s;
+    }
+
+    .chart-dot:hover {
+      r: 9;
+      fill-opacity: 1;
+      stroke-width: 2.5;
+      stroke: var(--fg);
+    }
+
+    .chart-frontier-dot:hover {
+      r: 10;
+    }
+
+    .chart-watermark {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      fill: var(--fg);
+      opacity: 0.08;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .chart-grid {
+      stroke: var(--line);
+      stroke-width: 1;
+    }
+
+    .chart-axis-text {
+      font-size: 11px;
+      fill: var(--mut);
+      user-select: none;
+    }
+
+    .chart-axis-title {
+      font-size: 11px;
+      font-weight: 500;
+      fill: var(--mut);
+      user-select: none;
+    }
+
+    .chart-lab-pill {
+      cursor: pointer;
+      user-select: none;
+      transition: opacity 0.2s, background-color 0.2s, border-color 0.2s, color 0.2s;
+      background: var(--row);
+    }
+
+    .chart-lab-pill:hover {
+      border-color: var(--acc);
+      color: var(--fg);
+    }
+
+    .chart-lab-pill.active {
+      border-color: var(--acc);
+      background: color-mix(in srgb, var(--acc) 18%, var(--row));
+      color: var(--fg);
+    }
+
     th {
       font-weight: 500;
       font-size: 12px;
@@ -1111,18 +1268,77 @@
       <!-- PICKS -->
       <section id="picks" class="grid gap-4 mt-6 sm:grid-cols-2 2xl:grid-cols-4"></section>
 
-      <section class="mt-14">
-        <h2 class="text-2xl font-semibold tracking-tight">Price vs intelligence</h2>
-        <p class="text-[13px] mt-1" style="color:var(--mut)">Blended $/1M on a log scale. Green dots on the dashed line
-          are the best score at their price.</p>
-        <div class="glass rounded-3xl p-4 mt-4"><svg id="chart" viewBox="0 0 900 360" class="w-full"></svg></div>
+      <!-- PRICE VS INTELLIGENCE ENHANCED GRAPH -->
+      <section class="mt-14" id="section-chart">
+        <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-4">
+          <div>
+            <div class="flex items-center gap-2.5">
+              <h2 class="text-2xl font-semibold tracking-tight">Price vs intelligence</h2>
+              <span class="chip" style="background:var(--glow);color:var(--acc);border-color:transparent">Pareto Frontier</span>
+            </div>
+            <p class="text-[13px] mt-1" style="color:var(--mut)">
+              Blended $/1M (75% input, 25% output) plotted against capability score. The frontier line traces maximum intelligence per dollar.
+            </p>
+          </div>
+
+          <!-- Chart Controls Toolbar -->
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Metric Selector -->
+            <div id="chart-metrics" class="seg inline-flex p-1 rounded-xl glass border border-[var(--line)] text-xs">
+              <button data-cm="coding" class="on">Coding Index</button>
+              <button data-cm="score">General Intel</button>
+              <button data-cm="agentic">Agentic %</button>
+              <button data-cm="live">LiveCode</button>
+              <button data-cm="term">Terminal</button>
+            </div>
+
+            <!-- Scale Toggle -->
+            <div id="chart-scale" class="seg inline-flex p-1 rounded-xl glass border border-[var(--line)] text-xs">
+              <button data-scale="log" class="on">Log scale</button>
+              <button data-scale="linear">Linear</button>
+            </div>
+
+            <!-- Frontier Only Filter Toggle -->
+            <button id="chart-frontier-toggle" class="glass px-3 py-1.5 rounded-xl text-xs font-medium border border-[var(--line)] hover:border-[var(--acc)] text-[var(--mut)] hover:text-[var(--fg)] transition flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-[var(--acc2)]"></span>
+              <span>Frontier only</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Labs Filter / Legend Pills -->
+        <div id="chart-labs-legend" class="flex flex-wrap items-center gap-1.5 mb-3 text-xs"></div>
+
+        <!-- Chart Container with SVG and Interactive Tooltip -->
+        <div class="glass rounded-3xl p-4 sm:p-6 mt-2 relative overflow-hidden group/chart" id="chart-container">
+          <!-- Floating interactive tooltip card -->
+          <div id="chart-tooltip" class="chart-tooltip glass shadow-2xl rounded-2xl p-4 border border-[var(--line)] text-xs pointer-events-none opacity-0 -translate-y-2"></div>
+          
+          <svg id="chart" viewBox="0 0 960 480" class="w-full h-auto block select-none"></svg>
+          
+          <!-- Bottom Legend & Helper Footnote -->
+          <div class="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t text-[11.5px]" style="border-color:var(--line);color:var(--mut)">
+            <div class="flex items-center gap-4 flex-wrap">
+              <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full ring-2 ring-[var(--acc2)] ring-offset-1 ring-offset-[var(--bg)] bg-[var(--acc2)]"></span>
+                <span class="font-medium text-[var(--fg)]">Pareto frontier</span> (highest score for price)
+              </span>
+              <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-[var(--mut)] opacity-40"></span>
+                <span>Standard candidate</span>
+              </span>
+              <span class="hidden sm:inline opacity-70">· Click any circle to open full model drawer</span>
+            </div>
+            <div id="chart-stats" class="tabular-nums font-mono text-[11px]"></div>
+          </div>
+        </div>
       </section>
       <!-- TABLE -->
       <section class="mt-14">
         <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
           <div>
             <h2 class="text-2xl font-semibold tracking-tight">Ranked candidates</h2>
-            <p class="text-[13px] mt-1" style="color:var(--mut)">Value = score² ÷ blended price. Blended = (in + 3 ×
+            <p class="text-[13px] mt-1" style="color:var(--mut)">Value = capability score ÷ blended price. Blended = (3 × in +
               out) ÷ 4. Click a header to sort, a row for details.</p>
           </div>
           <div id="count" class="text-sm" style="color:var(--mut)"></div>
@@ -1360,12 +1576,18 @@
         m => `<b>${mSp ? (m.speed / mSp).toFixed(1) : '—'}×</b> the median speed, with the first token in ${num(m.ttft, 2, 's')}.`,
         m => `Costs nothing and scores <b>${m.s.toFixed(1)}</b>${best ? ', ' + Math.max(0, best.s - m.s).toFixed(1) + ' below the best paid pick' : ''}.`
       ];
-      const picks = [['Best value', best, '🏆'], ['Smartest in budget', smart, '🧠'], ['Fastest generation', fast, '⚡'], ['Best free model', free, '🎁']];
+      const pickIcons = [
+        `<div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background:var(--glow);color:var(--acc)"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg></div>`,
+        `<div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(143,196,164,0.12);color:var(--acc2)"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/><path d="M9 21h6"/></svg></div>`,
+        `<div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(59,130,246,0.12);color:#3b82f6"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>`,
+        `<div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(168,85,247,0.12);color:#a855f7"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="14" rx="2"/><path d="M12 5a3 3 0 1 0-3 3h6a3 3 0 1 0-3-3Z"/><path d="M12 8v14"/><path d="M3 14h18"/></svg></div>`
+      ];
+      const picks = [['Best value', best, pickIcons[0]], ['Smartest in budget', smart, pickIcons[1]], ['Fastest generation', fast, pickIcons[2]], ['Best free model', free, pickIcons[3]]];
       const st = (l, v) => `<div><div class="text-[11px]" style="color:var(--mut)">${l}</div><div class="text-[13px] font-medium tabular-nums mt-0.5">${v}</div></div>`;
 
-      $('#picks').innerHTML = picks.map(([t, m, e], i) => m ? `
+      $('#picks').innerHTML = picks.map(([t, m, icon], i) => m ? `
     <button data-slug="${m.slug}" class="spot glass rounded-3xl p-6 text-left flex flex-col ${an ? 'rise' : ''}" style="--d:${420 + i * 90}ms;${i === 0 ? 'border-color:color-mix(in srgb,var(--acc) 50%,transparent)' : ''}">
-      <div class="flex items-center justify-between text-[13px]" style="color:var(--mut)"><span>${t}</span><span class="text-lg">${e}</span></div>
+      <div class="flex items-center justify-between text-[13px]" style="color:var(--mut)"><span class="font-medium">${t}</span>${icon}</div>
       <div class="mt-3 text-[22px] font-semibold tracking-tight leading-tight">${m.name}</div>
       <div class="mt-2.5 flex flex-wrap gap-1.5"><span class="chip" style="color:var(--acc)">${m.lab}</span>${m.tags.map(x => `<span class="chip">${x}</span>`).join('')}</div>
       <div class="mt-6 flex items-end justify-between"><div class="flex items-baseline gap-2"><span class="text-5xl font-semibold tracking-tighter grad">${m.s.toFixed(1)}</span><span class="text-xs" style="color:var(--mut)">${METRICS[S.metric]}</span></div><span class="chip">#${rank(m)} of ${R.length}</span></div>
@@ -1418,7 +1640,19 @@
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <h3 class="text-lg font-semibold tracking-tight text-[var(--fg)]">Value leaders</h3>
-              <span class="cursor-help text-xs text-[var(--mut)]" title="Benchmark performance per dollar. Scores come from the independent Artificial Analysis benchmarks; price is each model's combined rate for input and output tokens, weighted toward input to match typical usage (75% in, 25% out). Only models scoring in the top half qualify.">ⓘ</span>
+              <div class="tip-wrap">
+                <button type="button" aria-label="Value methodology details" class="tip-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  </svg>
+                </button>
+                <div class="tip-pop">
+                  <div class="font-semibold text-[var(--acc)] mb-1">OpenRouter Value Methodology</div>
+                  Benchmark performance per dollar. Scores come from independent Artificial Analysis benchmarks; price is combined rate weighted toward input (75% in, 25% out). Only models in the top half (score ≥ 50%) qualify.
+                </div>
+              </div>
             </div>
             <span class="chip" style="color:var(--acc)">Per dollar</span>
           </div>
@@ -1460,7 +1694,19 @@
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <h3 class="text-lg font-semibold tracking-tight text-[var(--fg)]">Fastest models</h3>
-              <span class="cursor-help text-xs text-[var(--mut)]" title="Highest median output speed across multiple providers.">ⓘ</span>
+              <div class="tip-wrap">
+                <button type="button" aria-label="Speed methodology details" class="tip-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  </svg>
+                </button>
+                <div class="tip-pop">
+                  <div class="font-semibold text-[var(--acc2)] mb-1">Speed Methodology</div>
+                  Highest median output throughput across multiple independent API providers (minimum 2 providers required).
+                </div>
+              </div>
             </div>
             <span class="chip" style="color:var(--acc2)">Speed</span>
           </div>
@@ -1505,11 +1751,23 @@
 
     function renderWarnings(warns) {
       const container = $('#warnings');
+      if (!container) return;
       if (!warns || !warns.length) {
         container.innerHTML = '';
         return;
       }
-      container.innerHTML = warns.map(w => `<div class="glass rounded-2xl p-3.5 mb-3 text-xs flex items-center gap-2.5 border-l-4" style="border-left-color:var(--acc);color:var(--fg)"><span class="text-base">ℹ️</span><span>${w}</span></div>`).join('');
+      container.innerHTML = warns.map(w => `
+        <div class="glass rounded-2xl p-3.5 mb-3 text-xs flex items-center gap-3 border-l-4" style="border-left-color:var(--acc);color:var(--fg)">
+          <div class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style="background:var(--glow);color:var(--acc)">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+          </div>
+          <span class="leading-relaxed">${w}</span>
+        </div>
+      `).join('');
     }
 
     /* ============ CUSTOM DROPDOWNS LOGIC ============ */
@@ -1831,30 +2089,446 @@
       kpiCount(); placeAll(); chart(R); cost(R); if (!$('#cmpsel').children.length && S.data.length >= 2) cmpInit();
     }
 
-    function chart(R) {
-      const W = 900, H = 360, L = 48, Rr = 20, T = 16, B = 36, px = m => Math.max(m.blend, 0.01);
-      if (!R.length) { $('#chart').innerHTML = ''; return; }
-      const lo = Math.log10(Math.min(...R.map(px)) * 0.8),
-        hi = Math.log10(Math.max(...R.map(px)) * 1.3),
-        sc = R.map(m => m.s).filter(v => v != null),
-        y0 = Math.floor(Math.min(...sc, 0) - 3),
-        y1 = Math.ceil(Math.max(...sc, 50) + 3);
-      const X = v => L + (Math.log10(v) - lo) / ((hi - lo) || 1) * (W - L - Rr);
-      const Y = v => H - B - (v - y0) / ((y1 - y0) || 1) * (H - T - B);
-      let best = -1;
-      const fr = [...R].sort((a, b) => px(a) - px(b) || (b.s || 0) - (a.s || 0)).filter(m => m.s > best && (best = m.s, 1));
-      const yt = [0, 1, 2, 3, 4].map(i => y0 + (y1 - y0) * i / 4);
-      const xt = [0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30].filter(v => Math.log10(v) >= lo && Math.log10(v) <= hi);
+    let chartState = {
+      metric: 'coding',
+      scale: 'log',
+      frontierOnly: false,
+      selectedLab: 'all'
+    };
+    let _cachedChartRows = [];
 
-      $('#chart').innerHTML = yt.map(v => `<line x1="${L}" x2="${W - Rr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="var(--mut)">${v.toFixed(0)}</text>`).join('')
-        + xt.map(v => `<text x="${X(v)}" y="${H - 12}" text-anchor="middle" font-size="11" fill="var(--mut)">$${v}</text>`).join('')
-        + `<polyline points="${fr.map(m => X(px(m)) + ',' + Y(m.s)).join(' ')}" fill="none" stroke="var(--acc)" stroke-width="2" stroke-dasharray="5 5" opacity=".7"/>`
-        + R.map(m => {
-          const f = fr.includes(m);
-          return `<circle class="dot" data-slug="${m.slug}" cx="${X(px(m))}" cy="${Y(m.s)}" r="${f ? 7 : 5}" fill="${f ? 'var(--acc2)' : 'var(--acc)'}" fill-opacity="${f ? 1 : 0.55}"><title>${m.name} · Score: ${m.s.toFixed(1)} · ${m.free ? 'Free' : money(m.blend)}</title></circle>`;
-        }).join('')
-        + fr.map(m => `<text x="${X(px(m)) + 10}" y="${Y(m.s) - 9}" font-size="11" fill="var(--fg)">${m.name.split(': ')[1] || m.name}</text>`).join('');
+    const LAB_COLORS = {
+      'anthropic': '#f97316',
+      'openai': '#10b981',
+      'deepseek': '#3b82f6',
+      'google': '#06b6d4',
+      'meta': '#8b5cf6',
+      'qwen': '#f59e0b',
+      'alibaba': '#f59e0b',
+      'mistral': '#ef4444',
+      'xai': '#ec4899',
+      'cohere': '#14b8a6',
+      'microsoft': '#0284c7',
+      'amazon': '#d97706',
+      'minimax': '#84cc16',
+      'zhipu': '#a855f7',
+      'other': '#94a3b8'
+    };
+
+    function getLabColor(lab) {
+      if (!lab) return '#94a3b8';
+      const l = lab.toLowerCase();
+      for (const [k, c] of Object.entries(LAB_COLORS)) {
+        if (l.includes(k)) return c;
+      }
+      return '#94a3b8';
     }
+
+    function getModelChartScore(m, metric) {
+      if (metric === 'coding') return m.coding ?? m.coding_pct ?? m.score;
+      if (metric === 'score') return m.score ?? m.intel_pct;
+      if (metric === 'agentic') return m.agentic_pct ?? m.agentic;
+      if (metric === 'live') return m.live;
+      if (metric === 'term') return m.term;
+      return m.s ?? m.score;
+    }
+
+    function chart(R) {
+      _cachedChartRows = R || [];
+      renderChart();
+    }
+
+    function renderChart() {
+      const R = _cachedChartRows;
+      const svg = $('#chart');
+      if (!svg) return;
+      if (!R || !R.length) {
+        svg.innerHTML = '<text x="480" y="240" text-anchor="middle" font-size="14" fill="var(--mut)">No models matching current filters</text>';
+        const statsEl = $('#chart-stats');
+        if (statsEl) statsEl.textContent = '';
+        return;
+      }
+
+      // Populate Lab Filter Pills in #chart-labs-legend
+      const rawLabs = [...new Set(R.map(m => m.lab))].filter(Boolean);
+      const topLabs = rawLabs.slice(0, 8);
+      const labLegend = $('#chart-labs-legend');
+      if (labLegend) {
+        labLegend.innerHTML = `
+          <span class="text-xs mr-1 font-medium" style="color:var(--mut)">Filter lab:</span>
+          <button data-lab="all" class="chart-lab-pill px-2.5 py-1 rounded-lg border text-xs font-medium ${chartState.selectedLab === 'all' ? 'active' : ''}" style="border-color:var(--line)">All (${R.length})</button>
+          ${topLabs.map(lab => {
+            const color = getLabColor(lab);
+            const count = R.filter(m => m.lab === lab).length;
+            const isAct = chartState.selectedLab === lab;
+            return `<button data-lab="${lab}" class="chart-lab-pill px-2.5 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${isAct ? 'active' : ''}" style="border-color:${isAct ? color : 'var(--line)'};color:${isAct ? 'var(--fg)' : 'var(--mut)'}">
+              <span class="w-2 h-2 rounded-full shrink-0" style="background:${color}"></span>
+              <span>${lab}</span>
+              <span class="opacity-60 text-[10px]">(${count})</span>
+            </button>`;
+          }).join('')}
+        `;
+        labLegend.querySelectorAll('button').forEach(btn => {
+          btn.onclick = () => {
+            chartState.selectedLab = btn.dataset.lab;
+            renderChart();
+          };
+        });
+      }
+
+      const W = 960, H = 480, L = 64, Rr = 36, T = 36, B = 48;
+      const metric = chartState.metric;
+      const metricLabels = {
+        coding: 'Coding Index (AA)',
+        score: 'General Intelligence (AA)',
+        agentic: 'Agentic & Tool-Use %',
+        live: 'LiveCodeBench',
+        term: 'TerminalBench'
+      };
+      const curMetricLabel = metricLabels[metric] || 'Score';
+
+      const priceVal = m => m.free ? (chartState.scale === 'log' ? 0.005 : 0) : Math.max(m.blend || 0.005, 0.005);
+
+      const valid = R.map(m => ({
+        m,
+        p: priceVal(m),
+        s: getModelChartScore(m, metric)
+      })).filter(d => d.s != null && !isNaN(d.s) && isFinite(d.s));
+
+      if (!valid.length) {
+        svg.innerHTML = '<text x="480" y="240" text-anchor="middle" font-size="14" fill="var(--mut)">No models have scores for ' + curMetricLabel + '</text>';
+        return;
+      }
+
+      const allPrices = valid.map(d => d.p);
+      const isLog = chartState.scale === 'log';
+      let lo, hi, X;
+      if (isLog) {
+        lo = Math.log10(Math.min(...allPrices) * 0.7);
+        hi = Math.log10(Math.max(...allPrices) * 1.35);
+        if (hi - lo < 0.5) hi = lo + 0.5;
+        X = p => L + (Math.log10(Math.max(p, 0.005)) - lo) / (hi - lo) * (W - L - Rr);
+      } else {
+        const minP = 0;
+        const maxP = Math.ceil(Math.max(...allPrices) * 1.1) || 1;
+        X = p => L + (p - minP) / (maxP - minP) * (W - L - Rr);
+      }
+
+      const allScores = valid.map(d => d.s);
+      const rawMinS = Math.min(...allScores);
+      const rawMaxS = Math.max(...allScores);
+      const y0 = Math.max(0, Math.floor(rawMinS - 4));
+      const y1 = Math.min(100, Math.ceil(rawMaxS + 4));
+      const ySpan = Math.max(y1 - y0, 10);
+      const Y = s => H - B - (s - y0) / ySpan * (H - T - B);
+
+      // Compute Pareto Frontier
+      const sortedByP = [...valid].sort((a, b) => a.p - b.p || b.s - a.s);
+      let bestS = -Infinity;
+      const frontierItems = [];
+      for (const item of sortedByP) {
+        if (item.s > bestS) {
+          frontierItems.push(item);
+          bestS = item.s;
+        }
+      }
+      const frontierSlugs = new Set(frontierItems.map(it => it.m.slug));
+
+      const yTicks = [0, 1, 2, 3, 4].map(i => y0 + ySpan * i / 4);
+
+      let xTicks = [];
+      if (isLog) {
+        const potential = [0.005, 0.01, 0.03, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 20, 50, 100];
+        xTicks = potential.filter(v => Math.log10(v) >= lo && Math.log10(v) <= hi);
+      } else {
+        const maxP = Math.ceil(Math.max(...allPrices) * 1.1) || 1;
+        xTicks = [0, 1, 2, 3, 4].map(i => maxP * i / 4);
+      }
+
+      let frontierAreaMarkup = '';
+      if (frontierItems.length >= 2) {
+        const areaPoints = [
+          `${X(frontierItems[0].p)},${H - B}`,
+          ...frontierItems.map(it => `${X(it.p)},${Y(it.s)}`),
+          `${X(frontierItems[frontierItems.length - 1].p)},${H - B}`
+        ].join(' ');
+        frontierAreaMarkup = `<polygon points="${areaPoints}" fill="url(#frontierGradient)" opacity="0.16" />`;
+      }
+
+      const frontierLinePoints = frontierItems.map(it => `${X(it.p)},${Y(it.s)}`).join(' ');
+      const frontierLineMarkup = frontierItems.length >= 2
+        ? `<polyline points="${frontierLinePoints}" fill="none" stroke="var(--acc2)" stroke-width="2.5" stroke-dasharray="5 4" opacity="0.85" filter="url(#paretoGlow)"/>`
+        : '';
+
+      const labelInterval = Math.max(1, Math.floor(frontierItems.length / 5));
+      const labeledFrontier = frontierItems.filter((_, idx) => idx % labelInterval === 0 || idx === frontierItems.length - 1);
+      const frontierLabelsMarkup = labeledFrontier.map(it => {
+        const cx = X(it.p), cy = Y(it.s);
+        const name = (it.m.name || it.m.slug).split(': ')[1] || it.m.name;
+        const short = name.length > 20 ? name.slice(0, 18) + '…' : name;
+        const xOffset = cx > W - 140 ? -12 : 12;
+        const anchor = cx > W - 140 ? 'end' : 'start';
+        return `
+          <g class="pointer-events-none">
+            <rect x="${anchor === 'end' ? cx - 110 : cx + 8}" y="${cy - 18}" width="102" height="18" rx="6" fill="var(--bg)" opacity="0.75" />
+            <text x="${cx + xOffset}" y="${cy - 5}" text-anchor="${anchor}" font-size="11" font-weight="600" fill="var(--fg)">${short}</text>
+          </g>
+        `;
+      }).join('');
+
+      const crosshairMarkup = `
+        <g id="chart-crosshairs" opacity="0" pointer-events="none" class="transition-opacity duration-150">
+          <line id="ch-x" x1="${L}" x2="${W - Rr}" y1="0" y2="0" stroke="var(--acc)" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.65" />
+          <line id="ch-y" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--acc)" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.65" />
+          <rect id="ch-badge-x-bg" x="0" y="${H - B + 4}" width="54" height="18" rx="5" fill="var(--fg)" />
+          <text id="ch-badge-x" x="0" y="${H - B + 17}" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--bg)">$0.00</text>
+          <rect id="ch-badge-y-bg" x="${L - 46}" y="0" width="38" height="18" rx="5" fill="var(--fg)" />
+          <text id="ch-badge-y" x="${L - 27}" y="0" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--bg)">0.0</text>
+        </g>
+      `;
+
+      svg.innerHTML = `
+        <defs>
+          <linearGradient id="frontierGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--acc2)" stop-opacity="0.4" />
+            <stop offset="100%" stop-color="var(--acc2)" stop-opacity="0.0" />
+          </linearGradient>
+          <filter id="paretoGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+
+        <!-- Efficiency Quadrant Watermarks -->
+        <text x="${L + 24}" y="${T + 40}" class="chart-watermark">🌟 Exceptional Value Sweetspot (High Capability / Budget)</text>
+        <text x="${W - Rr - 20}" y="${T + 40}" text-anchor="end" class="chart-watermark">🧠 Frontier Flagship Tier (Peak Intelligence)</text>
+        <text x="${L + 24}" y="${H - B - 24}" class="chart-watermark">⚡ High-Speed & Utility</text>
+
+        <!-- Y Gridlines & Labels -->
+        ${yTicks.map(v => `
+          <line x1="${L}" x2="${W - Rr}" y1="${Y(v)}" y2="${Y(v)}" class="chart-grid" />
+          <text x="${L - 12}" y="${Y(v) + 4}" text-anchor="end" class="chart-axis-text font-mono">${v.toFixed(0)}</text>
+        `).join('')}
+
+        <!-- X Gridlines & Labels -->
+        ${xTicks.map(v => {
+          const xPos = X(v);
+          const label = v === 0.005 ? 'Free' : (v < 0.1 ? '$' + v.toFixed(3) : (v < 1 ? '$' + v.toFixed(2) : '$' + v));
+          return `
+            <line x1="${xPos}" x2="${xPos}" y1="${T}" y2="${H - B}" class="chart-grid" opacity="0.6" stroke-dasharray="2 3" />
+            <text x="${xPos}" y="${H - 14}" text-anchor="middle" class="chart-axis-text font-mono">${label}</text>
+          `;
+        }).join('')}
+
+        <!-- Axis Titles -->
+        <text x="${L}" y="${T - 14}" class="chart-axis-title">↑ ${curMetricLabel} (0–100)</text>
+        <text x="${W - Rr}" y="${H - 14}" text-anchor="end" class="chart-axis-title">Blended Price / 1M Tokens (75% in, 25% out) →</text>
+
+        <!-- Area & Frontier Lines -->
+        ${frontierAreaMarkup}
+        ${frontierLineMarkup}
+
+        <!-- Dots -->
+        <g id="chart-dots-layer">
+          ${valid.map(item => {
+            const isF = frontierSlugs.has(item.m.slug);
+            const cx = X(item.p);
+            const cy = Y(item.s);
+            const labColor = getLabColor(item.m.lab);
+
+            const labMatch = chartState.selectedLab === 'all' || item.m.lab === chartState.selectedLab;
+            const frontierMatch = !chartState.frontierOnly || isF;
+            const isDimmed = !labMatch || !frontierMatch;
+            const opacity = isDimmed ? 0.08 : (isF ? 1 : 0.65);
+
+            if (isF) {
+              return `
+                <g class="chart-dot-group cursor-pointer" data-slug="${item.m.slug}" data-p="${item.p}" data-s="${item.s}">
+                  <circle cx="${cx}" cy="${cy}" r="11" fill="none" stroke="var(--acc2)" stroke-width="1.5" opacity="${isDimmed ? 0.08 : 0.65}" />
+                  <circle class="chart-dot chart-frontier-dot" cx="${cx}" cy="${cy}" r="6.5" fill="var(--acc2)" stroke="var(--bg)" stroke-width="1.8" opacity="${opacity}" />
+                </g>
+              `;
+            } else {
+              return `
+                <g class="chart-dot-group cursor-pointer" data-slug="${item.m.slug}" data-p="${item.p}" data-s="${item.s}">
+                  <circle class="chart-dot" cx="${cx}" cy="${cy}" r="5" fill="${labColor}" stroke="var(--bg)" stroke-width="1.2" fill-opacity="${opacity}" />
+                </g>
+              `;
+            }
+          }).join('')}
+        </g>
+
+        <!-- Frontier Labels -->
+        ${frontierLabelsMarkup}
+
+        <!-- Crosshairs -->
+        ${crosshairMarkup}
+      `;
+
+      const statsEl = $('#chart-stats');
+      if (statsEl) {
+        const bestFrontier = frontierItems[frontierItems.length - 1];
+        const bestName = bestFrontier ? (bestFrontier.m.name.split(': ')[1] || bestFrontier.m.name) : '—';
+        statsEl.textContent = `${valid.length} models plotted · ${frontierItems.length} on Pareto frontier · Peak: ${bestName} (${bestFrontier ? bestFrontier.s.toFixed(1) : ''})`;
+      }
+
+      attachChartInteractions(valid, frontierSlugs, X, Y, curMetricLabel);
+    }
+
+    function attachChartInteractions(valid, frontierSlugs, X, Y, metricLabel) {
+      const svg = $('#chart');
+      const container = $('#chart-container');
+      const tooltip = $('#chart-tooltip');
+      const crosshairs = $('#chart-crosshairs');
+      const chX = $('#ch-x');
+      const chY = $('#ch-y');
+      const chBadgeX = $('#ch-badge-x');
+      const chBadgeXBg = $('#ch-badge-x-bg');
+      const chBadgeY = $('#ch-badge-y');
+      const chBadgeYBg = $('#ch-badge-y-bg');
+
+      if (!svg || !tooltip) return;
+
+      const modelMap = new Map(valid.map(v => [v.m.slug, v]));
+
+      svg.querySelectorAll('.chart-dot-group').forEach(group => {
+        const slug = group.dataset.slug;
+        const data = modelMap.get(slug);
+        if (!data) return;
+
+        group.onmouseenter = e => {
+          const m = data.m;
+          const s = data.s;
+          const p = data.p;
+          const isF = frontierSlugs.has(slug);
+          const labColor = getLabColor(m.lab);
+
+          const cx = X(p);
+          const cy = Y(s);
+          if (crosshairs) {
+            chX.setAttribute('y1', cy);
+            chX.setAttribute('y2', cy);
+            chY.setAttribute('x1', cx);
+            chY.setAttribute('x2', cx);
+
+            const pLabel = m.free ? 'Free' : (p < 0.1 ? '$' + p.toFixed(3) : '$' + p.toFixed(2));
+            chBadgeX.textContent = pLabel;
+            chBadgeX.setAttribute('x', cx);
+            chBadgeXBg.setAttribute('x', cx - 27);
+
+            chBadgeY.textContent = s.toFixed(1);
+            chBadgeY.setAttribute('y', cy + 4);
+            chBadgeYBg.setAttribute('y', cy - 9);
+
+            crosshairs.setAttribute('opacity', '1');
+          }
+
+          tooltip.innerHTML = `
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${labColor}"></span>
+                <span class="font-semibold text-[13px] text-[var(--fg)] truncate">${m.name}</span>
+              </div>
+              ${isF ? '<span class="chip shrink-0 !text-[10px] font-semibold" style="color:var(--acc2);border-color:var(--acc2)">★ Frontier</span>' : ''}
+            </div>
+            <div class="text-[11px] text-[var(--mut)] mb-2 flex items-center gap-1.5">
+              <span class="chip py-0.5 px-2">${m.lab || 'Community'}</span>
+              <span class="font-mono text-[10px] truncate">${m.slug}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs py-2 border-y my-2" style="border-color:var(--line)">
+              <div>
+                <div style="color:var(--mut)">${metricLabel}</div>
+                <div class="font-semibold text-sm text-[var(--fg)] tabular-nums">${s.toFixed(1)} <span class="text-[10px] font-normal text-[var(--mut)]">/ 100</span></div>
+              </div>
+              <div>
+                <div style="color:var(--mut)">Blended $/1M</div>
+                <div class="font-semibold text-sm tabular-nums" style="color:var(--acc)">${m.free ? 'Free' : money(m.blend)}</div>
+              </div>
+              <div>
+                <div style="color:var(--mut)">Input / Output</div>
+                <div class="font-medium text-[var(--fg)] tabular-nums">${money(m.inP)} / ${money(m.outP)}</div>
+              </div>
+              <div>
+                <div style="color:var(--mut)">Speed · Latency</div>
+                <div class="font-medium text-[var(--fg)] tabular-nums">${m.speed ? Math.round(m.speed) + ' tok/s' : '—'} · ${m.ttft ? Math.round(m.ttft * 1000) + 'ms' : '—'}</div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-[11px] pt-1" style="color:var(--mut)">
+              <span>Context: ${m.ctx ? (m.ctx >= 1000 ? Math.round(m.ctx/1000)+'M' : m.ctx+'K') : '—'}</span>
+              <span class="font-medium" style="color:var(--acc)">Click to view specs ›</span>
+            </div>
+          `;
+
+          const cRect = container.getBoundingClientRect();
+          const targetCircle = group.querySelector('.chart-dot');
+          const dRect = targetCircle ? targetCircle.getBoundingClientRect() : group.getBoundingClientRect();
+
+          let left = dRect.left - cRect.left + 16;
+          let top = dRect.top - cRect.top - 20;
+
+          if (left + 300 > cRect.width) {
+            left = dRect.left - cRect.left - 306;
+          }
+          if (top < 10) top = 10;
+          if (top + 180 > cRect.height) top = cRect.height - 185;
+
+          tooltip.style.left = Math.max(8, left) + 'px';
+          tooltip.style.top = top + 'px';
+          tooltip.classList.remove('opacity-0', '-translate-y-2');
+        };
+
+        group.onmouseleave = () => {
+          if (crosshairs) crosshairs.setAttribute('opacity', '0');
+          tooltip.classList.add('opacity-0', '-translate-y-2');
+        };
+
+        group.onclick = e => {
+          e.stopPropagation();
+          openDrawer(slug);
+        };
+      });
+    }
+
+    function initChartControls() {
+      $('#chart-metrics')?.addEventListener('click', e => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const m = btn.dataset.cm;
+        if (!m) return;
+        chartState.metric = m;
+        $('#chart-metrics').querySelectorAll('button').forEach(b => b.classList.toggle('on', b === btn));
+        renderChart();
+      });
+
+      $('#chart-scale')?.addEventListener('click', e => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const s = btn.dataset.scale;
+        if (!s) return;
+        chartState.scale = s;
+        $('#chart-scale').querySelectorAll('button').forEach(b => b.classList.toggle('on', b === btn));
+        renderChart();
+      });
+
+      $('#chart-frontier-toggle')?.addEventListener('click', () => {
+        chartState.frontierOnly = !chartState.frontierOnly;
+        const btn = $('#chart-frontier-toggle');
+        if (btn) {
+          btn.classList.toggle('on', chartState.frontierOnly);
+          if (chartState.frontierOnly) {
+            btn.style.borderColor = 'var(--acc2)';
+            btn.style.color = 'var(--fg)';
+            btn.style.background = 'var(--row)';
+          } else {
+            btn.style.borderColor = '';
+            btn.style.color = '';
+            btn.style.background = '';
+          }
+        }
+        renderChart();
+      });
+    }
+    initChartControls();
 
     function cost(R) {
       const r = +$('#c-req').value || 0, ti = +$('#c-in').value || 0, to = +$('#c-out').value || 0;
