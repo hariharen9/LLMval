@@ -1083,7 +1083,7 @@
           <!-- Custom Switch: Batch pricing -->
           <div class="flex flex-col justify-end pb-1.5">
             <div class="text-xs mb-2 font-medium" style="color:var(--mut)">Batch pricing</div>
-            <label class="c-switch" id="batch-switch">
+            <label class="c-switch on" id="batch-switch">
               <span class="c-switch-track">
                 <span class="c-switch-thumb"></span>
               </span>
@@ -1091,6 +1091,20 @@
             </label>
           </div>
         </div>
+      </section>
+
+      <!-- OPENROUTER DISCOVER LIVE LANES -->
+      <section class="mt-8 mb-4">
+        <div class="flex items-center justify-between mb-3.5">
+          <div class="flex items-center gap-2.5">
+            <span class="text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-lg" style="background:var(--glow);color:var(--acc)">OpenRouter Discover</span>
+            <span class="text-[13.5px] font-medium text-[var(--mut)]">Real-time discover rankings synced with openrouter.ai/discover</span>
+          </div>
+          <a href="https://openrouter.ai/discover" target="_blank" rel="noopener" class="text-xs font-medium hover:underline flex items-center gap-1" style="color:var(--acc)">
+            openrouter.ai/discover ↗
+          </a>
+        </div>
+        <div id="or-lanes" class="grid grid-cols-1 lg:grid-cols-2 gap-5"></div>
       </section>
 
       <div id="kpis" style="--d:340ms" class="rise grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6"></div>
@@ -1231,6 +1245,12 @@
           lab: r.creator || (r.id.includes('/') ? r.id.split('/')[0] : 'Unknown'),
           score: r.intel,
           coding: r.coding,
+          coding_pct: r.coding_pct,
+          agentic_pct: r.agentic_pct,
+          intel_pct: r.intel_pct,
+          avg_pct: r.avg_pct,
+          weekly_tokens: r.weekly_tokens,
+          providers: r.providers,
           live: r.livecodebench,
           term: r.terminalbench,
           math: r.math,
@@ -1254,16 +1274,33 @@
     }
 
     /* ============ STATE ============ */
-    const METRICS = { score: 'General Intel', coding: 'Coding Index', live: 'LiveCodeBench', term: 'TerminalBench' };
-    const COLS = [['name', 'Model'], ['score', 'General'], ['coding', 'Coding'], ['live', 'LiveCode'], ['term', 'Terminal'], ['inP', 'In $/1M'], ['outP', 'Out $/1M'], ['blend', 'Blended'], ['value', 'Value'], ['speed', 'Tok/s'], ['ttft', 'TTFT'], ['ctx', 'Context']];
+    const METRICS = { coding: 'Coding Index', score: 'General Intel', live: 'LiveCodeBench', term: 'TerminalBench' };
+    const COLS = [
+      ['name', 'Model'],
+      ['coding_pct', 'Coding %'],
+      ['agentic_pct', 'Agentic %'],
+      ['score', 'General'],
+      ['coding', 'Coding'],
+      ['live', 'LiveCode'],
+      ['term', 'Terminal'],
+      ['inP', 'In $/1M'],
+      ['outP', 'Out $/1M'],
+      ['blend', 'Blended (75/25)'],
+      ['value', 'Value (Cap/$)'],
+      ['speed', 'Tok/s'],
+      ['ttft', 'TTFT'],
+      ['ctx', 'Context']
+    ];
     let S = { data: [], metric: 'coding', sort: 'value', dir: -1, loaded: false, meta: null, shown: false };
-    let F = { lab: 'all', age: 90, includeBatch: false };
+    let F = { lab: 'all', age: 90, includeBatch: true };
 
     const $ = s => document.querySelector(s);
-    const blend = m => (m.inP + 3 * m.outP) / 4;
+    // OpenRouter combined rate: weighted toward input (75% in, 25% out)
+    const blend = m => (3 * m.inP + m.outP) / 4;
+    // OpenRouter capability per dollar of list price
     const val = (m, k) => {
-      const sc = m[k] ?? (k === 'coding' ? m.score : (k === 'score' ? m.coding : null));
-      return sc == null ? null : m.free || blend(m) === 0 ? null : (sc * sc) / blend(m);
+      const sc = m.avg_pct ?? (m[k] ?? (k === 'coding' ? (m.coding_pct ?? m.coding) : (m.intel_pct ?? m.score)));
+      return sc == null ? null : m.free || blend(m) === 0 ? null : (sc / blend(m));
     };
     const money = n => n === 0 ? 'Free' : n == null ? '—' : '$' + (n < 0.1 ? n.toFixed(3) : n.toFixed(2));
     const num = (n, f = 0, u = '') => n == null ? '—' : Number(n).toFixed(f) + u;
@@ -1281,7 +1318,7 @@
         incBatch = F.includeBatch;
 
       return S.data.map(m => {
-        const sc = m[S.metric] ?? (S.metric === 'coding' ? m.score : (S.metric === 'score' ? m.coding : null));
+        const sc = m[S.metric] ?? (S.metric === 'coding' ? (m.coding_pct ?? m.coding ?? m.score) : (S.metric === 'score' ? (m.intel_pct ?? m.score ?? m.coding) : null));
         return {
           ...m,
           free: m.inP === 0 && m.outP === 0,
@@ -1346,16 +1383,124 @@
       $('#thead').innerHTML = COLS.map(([k, l]) => `<th data-k="${k}" class="${S.sort === k ? 'sorted' : ''}">${l}${S.sort === k ? (S.dir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('');
       $('#tbody').innerHTML = R.map((m, i) => `<tr data-slug="${m.slug}" style="animation-delay:${Math.min(i * 20, 400)}ms">
     <td class="!whitespace-normal min-w-[260px]"><div class="font-medium">${m.name}</div><div class="mt-1.5 flex flex-wrap gap-1"><span class="chip" style="color:var(--acc)">${m.lab}</span>${m.tags.map(t => `<span class="chip">${t}</span>`).join('')}</div></td>
+    <td class="font-semibold text-[var(--acc)]">${m.coding_pct != null ? m.coding_pct + '%' : '—'}</td>
+    <td class="font-semibold text-[var(--acc2)]">${m.agentic_pct != null ? m.agentic_pct + '%' : '—'}</td>
     <td class="font-semibold">${num(m.score, 1)}</td><td>${num(m.coding, 1)}</td><td>${num(m.live, 1)}</td><td>${num(m.term, 1)}</td>
     <td>${money(m.inP)}</td><td>${money(m.outP)}</td><td>${m.free ? 'Free' : money(m.blend)}</td>
-    <td>${m.value ? `<span class="mr-2">${Math.round(m.value)}</span><span class="bar"><b style="width:0" data-w="${(m.value / mx) * 100}%"></b></span>` : '—'}</td>
+    <td>${m.value ? `<span class="mr-2">${Number(m.value).toFixed(1)}</span><span class="bar"><b style="width:0" data-w="${Math.min((m.value / mx) * 100, 100)}%"></b></span>` : '—'}</td>
     <td>${num(m.speed)}</td><td>${num(m.ttft, 2, 's')}</td><td>${m.ctx ? (m.ctx >= 1000 ? Math.round(m.ctx) + 'K' : m.ctx + 'K') : '—'}</td></tr>`
-      ).join('') || `<tr><td colspan="12" class="!text-center py-16" style="color:var(--mut)">No models match. Lower the min score or raise the price ceiling.</td></tr>`;
+      ).join('') || `<tr><td colspan="14" class="!text-center py-16" style="color:var(--mut)">No models match. Lower the min score or raise the price ceiling.</td></tr>`;
+    }
+
+    function renderOrLanes() {
+      const container = $('#or-lanes');
+      if (!container) return;
+      const meta = S.meta || {};
+      const lanes = meta.openrouter_lanes || {};
+      const vLeaders = lanes.value_leaders || [];
+      const fModels = lanes.fastest_models || [];
+
+      if (!vLeaders.length && !fModels.length) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const fmtTok = n => {
+        if (!n || n <= 0) return '—';
+        if (n >= 1e12) return (n / 1e12).toFixed(1) + 'T';
+        if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+        if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+        return Number(n).toLocaleString();
+      };
+
+      const valCard = `
+        <div class="glass rounded-3xl p-5 sm:p-6 flex flex-col">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <h3 class="text-lg font-semibold tracking-tight text-[var(--fg)]">Value leaders</h3>
+              <span class="cursor-help text-xs text-[var(--mut)]" title="Benchmark performance per dollar. Scores come from the independent Artificial Analysis benchmarks; price is each model's combined rate for input and output tokens, weighted toward input to match typical usage (75% in, 25% out). Only models scoring in the top half qualify.">ⓘ</span>
+            </div>
+            <span class="chip" style="color:var(--acc)">Per dollar</span>
+          </div>
+          <p class="text-xs text-[var(--mut)] mt-1 mb-4">The most capability per dollar of list price.</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="border-b" style="border-color:var(--line);color:var(--mut)">
+                  <th class="pb-2 font-normal w-7 text-center">#</th>
+                  <th class="pb-2 font-normal">Model</th>
+                  <th class="pb-2 font-normal text-right">Coding pctl</th>
+                  <th class="pb-2 font-normal text-right">Agentic pctl</th>
+                  <th class="pb-2 font-normal text-right">Tokens</th>
+                  <th class="pb-2 font-normal text-right">$/1M</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${vLeaders.slice(0, 5).map((m, idx) => `
+                  <tr data-slug="${m.id}" class="cursor-pointer hover:bg-[var(--row)] transition border-b last:border-0" style="border-color:var(--line)">
+                    <td class="py-2.5 font-medium text-center" style="color:var(--mut)">${idx + 1}</td>
+                    <td class="py-2.5">
+                      <div class="font-medium text-[13px] text-[var(--fg)] truncate max-w-[180px]">${m.name}</div>
+                      <div class="text-[10.5px] text-[var(--mut)] truncate">${m.creator || m.id}</div>
+                    </td>
+                    <td class="py-2.5 text-right font-medium text-[var(--fg)] tabular-nums">${m.coding_pct != null ? m.coding_pct : '—'}</td>
+                    <td class="py-2.5 text-right font-medium text-[var(--fg)] tabular-nums">${m.agentic_pct != null ? m.agentic_pct : '—'}</td>
+                    <td class="py-2.5 text-right text-[var(--mut)] tabular-nums">${fmtTok(m.weekly_tokens)}</td>
+                    <td class="py-2.5 text-right font-semibold text-[var(--acc)] tabular-nums">${money(m.blended)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      const fastCard = `
+        <div class="glass rounded-3xl p-5 sm:p-6 flex flex-col">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <h3 class="text-lg font-semibold tracking-tight text-[var(--fg)]">Fastest models</h3>
+              <span class="cursor-help text-xs text-[var(--mut)]" title="Highest median output speed across multiple providers.">ⓘ</span>
+            </div>
+            <span class="chip" style="color:var(--acc2)">Speed</span>
+          </div>
+          <p class="text-xs text-[var(--mut)] mt-1 mb-4">Highest median output speed across multiple providers.</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="border-b" style="border-color:var(--line);color:var(--mut)">
+                  <th class="pb-2 font-normal w-7 text-center">#</th>
+                  <th class="pb-2 font-normal">Model</th>
+                  <th class="pb-2 font-normal text-right">Throughput</th>
+                  <th class="pb-2 font-normal text-right">TTFT p50</th>
+                  <th class="pb-2 font-normal text-right">Providers</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${fModels.slice(0, 5).map((m, idx) => `
+                  <tr data-slug="${m.id}" class="cursor-pointer hover:bg-[var(--row)] transition border-b last:border-0" style="border-color:var(--line)">
+                    <td class="py-2.5 font-medium text-center" style="color:var(--mut)">${idx + 1}</td>
+                    <td class="py-2.5">
+                      <div class="font-medium text-[13px] text-[var(--fg)] truncate max-w-[180px]">${m.name}</div>
+                      <div class="text-[10.5px] text-[var(--mut)] truncate">${m.creator || m.id}</div>
+                    </td>
+                    <td class="py-2.5 text-right font-medium text-[var(--acc2)] tabular-nums">${m.tps ? Math.round(m.tps) + ' tok/s' : '—'}</td>
+                    <td class="py-2.5 text-right text-[var(--mut)] tabular-nums">${m.ttft ? Math.round(m.ttft * 1000) + 'ms' : '—'}</td>
+                    <td class="py-2.5 text-right text-[var(--fg)] tabular-nums">${m.providers ? m.providers : '—'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      container.innerHTML = valCard + fastCard;
     }
 
     function skeleton() {
       $('#picks').innerHTML = [0, 1, 2, 3].map(() => '<div class="shimmer rounded-3xl h-[240px]"></div>').join('');
-      $('#tbody').innerHTML = Array(6).fill('<tr><td colspan="12"><div class="shimmer h-8 rounded-lg"></div></td></tr>').join('');
+      $('#tbody').innerHTML = Array(6).fill('<tr><td colspan="14"><div class="shimmer h-8 rounded-lg"></div></td></tr>').join('');
     }
 
     function renderWarnings(warns) {
@@ -1501,6 +1646,7 @@
 
         renderWarnings(meta.warnings);
         render();
+        renderOrLanes();
       } catch (err) {
         console.error(err);
         $('#status').textContent = 'Error loading data: ' + err.message;
@@ -1516,6 +1662,8 @@
       if (!m) return;
       const stat = (l, v) => `<div class="rounded-2xl p-4" style="background:var(--row)"><div class="text-xs" style="color:var(--mut)">${l}</div><div class="text-xl font-semibold mt-1 tracking-tight">${v}</div></div>`;
       const bm = [
+        ['Coding Percentile (AA)', m.coding_pct != null ? m.coding_pct + '%' : null],
+        ['Agentic Percentile (AA)', m.agentic_pct != null ? m.agentic_pct + '%' : null],
         ['General Intelligence', m.score],
         ['Coding Index', m.coding],
         ['LiveCodeBench', m.live],

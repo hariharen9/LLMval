@@ -396,8 +396,29 @@ def get_benchmarks_data(force: bool, aa_key: str, warns: list) -> tuple:
     return [], None
 
 
+def fetch_openrouter_discover_lanes() -> dict:
+    """Extracts live discover lanes directly from openrouter.ai/discover ItemList."""
+    try:
+        req = urllib.request.Request("https://openrouter.ai/discover", headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        ctx = get_ssl_context(fallback_unverified=True)
+        with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
+            html = resp.read().decode("utf-8")
+        m = re.search(r'\{"@context":"https://schema\.org","@type":"ItemList","@id":"https://openrouter\.ai/discover#models".*?\]\}', html)
+        if m:
+            items = json.loads(m.group(0)).get("itemListElement", [])
+            return {
+                "value_leaders": items[0:5],
+                "fastest_models": items[5:10],
+                "latest_aliases": items[10:15],
+                "free_models": items[15:20],
+            }
+    except Exception:
+        pass
+    return {}
+
+
 def build_dataset(force: bool = False, aa_key: str = None) -> dict:
-    """Builds the comprehensive model table with matched benchmark scores and pricing."""
+    """Builds the comprehensive model table with matched benchmark scores, OpenRouter percentiles and pricing."""
     if aa_key is None:
         aa_key = os.environ.get("AA_API_KEY", AA_KEY)
 
@@ -411,17 +432,61 @@ def build_dataset(force: bool = False, aa_key: str = None) -> dict:
         force,
         60,
         warns,
-        "OpenRouter",
+        "OpenRouter Models",
     )
 
     if not or_data:
         return {"error": "Could not connect to OpenRouter and no local cache was found. " + " ".join(warns)}
 
-    # 2. Get Benchmarks (1-day limit per run)
+    # 1b. Fetch OpenRouter Authoritative Benchmarks (AA percentiles & weighted prices)
+    or_bench_data, _ = get_cached_or_fetch(
+        "openrouter_benchmarks",
+        AA_TTL,
+        lambda: http_get("https://openrouter.ai/api/frontend/v1/rankings/benchmarks").get("data", {}),
+        force,
+        3600,
+        warns,
+        "OpenRouter Benchmarks",
+    )
+
+    # 1c. Fetch OpenRouter Multi-Provider Performance (real p50 throughput & latency)
+    or_perf_data, _ = get_cached_or_fetch(
+        "openrouter_performance",
+        OR_TTL,
+        lambda: http_get("https://openrouter.ai/api/frontend/v1/rankings/performance").get("data", []),
+        force,
+        60,
+        warns,
+        "OpenRouter Performance",
+    )
+
+    # 1d. Fetch OpenRouter Discovery (weekly token volume totals)
+    or_disc_data, _ = get_cached_or_fetch(
+        "openrouter_discovery",
+        3600,
+        lambda: http_get("https://openrouter.ai/api/frontend/v1/rankings/discovery").get("data", {}),
+        force,
+        600,
+        warns,
+        "OpenRouter Discovery",
+    )
+
+    # 1e. Fetch OpenRouter Discover Lanes (exact live discover ordering)
+    or_lanes_raw, _ = get_cached_or_fetch(
+        "openrouter_discover_lanes",
+        3600,
+        fetch_openrouter_discover_lanes,
+        force,
+        600,
+        warns,
+        "OpenRouter Discover Lanes",
+    )
+
+    # 2. Get Raw Artificial Analysis Benchmarks (1-day limit per run)
     aa_raw_list, aa_age = get_benchmarks_data(force, aa_key, warns)
     aa_list = parse_artificial_analysis_models(aa_raw_list or [])
 
-    # Build lookup index for AA
+    # Build lookup index for AA raw data
     aa_index = {}
     creators_set = set()
     for item in aa_list:
@@ -434,6 +499,45 @@ def build_dataset(force: bool = False, aa_key: str = None) -> dict:
         c_name = extract_creator_name(item.get("creator"))
         if c_name:
             creators_set.add(c_name)
+
+    # Extract OpenRouter benchmark percentiles
+    or_bench = or_bench_data or {}
+    aa_data_block = or_bench.get("aaData") or {}
+    pcts_by_slug = aa_data_block.get("percentilesBySlug") or {}
+
+    pct_lookup = {}
+    for k, v in pcts_by_slug.items():
+        pct_lookup[normalize_slug(k)] = v
+        no_date = re.sub(r"-\d{8}$", "", k)
+        if no_date != k:
+            pct_lookup[normalize_slug(no_date)] = v
+
+    # Performance lookup by slug and id
+    perf_map = {}
+    if isinstance(or_perf_data, list):
+        for p in or_perf_data:
+            if isinstance(p, dict):
+                if p.get("slug"):
+                    perf_map[p["slug"]] = p
+                    perf_map[normalize_slug(p["slug"])] = p
+                if p.get("id"):
+                    perf_map[p["id"]] = p
+                    perf_map[normalize_slug(p["id"])] = p
+
+    # Discovery totals lookup (weekly tokens)
+    disc_totals = {}
+    if isinstance(or_disc_data, dict):
+        disc_totals = or_disc_data.get("totals") or {}
+
+    def get_weekly_tokens(mid: str, base: str) -> int:
+        for k in [mid, base]:
+            if k in disc_totals:
+                return disc_totals[k].get("t", 0)
+        norm_b = normalize_slug(base)
+        for tk, tv in disc_totals.items():
+            if normalize_slug(tk).startswith(norm_b) or norm_b.startswith(normalize_slug(tk)):
+                return tv.get("t", 0)
+        return 0
 
     # Load local overrides from working dir or package root
     aliases = load_json(DATA_DIR / "aliases.json", {})
@@ -463,13 +567,41 @@ def build_dataset(force: bool = False, aa_key: str = None) -> dict:
         # Guess creator from slug namespace if not present
         creator_guess = base.split("/")[0].replace("-", " ").title() if "/" in base else ""
 
+        # OpenRouter standard: combined rate weighted toward input to match typical usage (75% in, 25% out)
+        blended = (3 * pin + pout) / 4.0
+
+        # Percentile matching from OpenRouter aaData
+        norm_base = normalize_slug(base)
+        norm_mid = normalize_slug(mid)
+        p_info = pct_lookup.get(norm_mid) or pct_lookup.get(norm_base)
+        if not p_info:
+            for pk, pv in pct_lookup.items():
+                if len(pk) >= 5 and (pk == norm_base or norm_base.startswith(pk) or pk.startswith(norm_base)):
+                    p_info = pv
+                    break
+
+        intel_pct = p_info.get("intelligence") if p_info else None
+        coding_pct = p_info.get("coding") if p_info else None
+        agentic_pct = p_info.get("agentic") if p_info else None
+        valid_pcts = [p for p in [intel_pct, coding_pct, agentic_pct] if p is not None and isinstance(p, (int, float))]
+        avg_pct = (sum(valid_pcts) / len(valid_pcts)) if valid_pcts else None
+
+        # Performance telemetry matching
+        perf_item = perf_map.get(mid) or perf_map.get(base) or perf_map.get(norm_mid) or perf_map.get(norm_base)
+        tps = perf_item.get("p50_throughput") if perf_item else None
+        ttft = (perf_item.get("p50_latency") / 1000.0) if (perf_item and perf_item.get("p50_latency")) else None
+        providers = perf_item.get("provider_count") if perf_item else None
+
+        # Weekly tokens
+        weekly_tokens = get_weekly_tokens(mid, base)
+
         row = {
             "id": mid,
             "name": m.get("name", mid),
             "creator": creator_guess,
             "pin": pin,
             "pout": pout,
-            "blended": (pin + 3 * pout) / 4,
+            "blended": blended,
             "free": variant == "free" or (pin == 0 and pout == 0),
             "variant": variant,
             "ctx": m.get("context_length"),
@@ -477,11 +609,19 @@ def build_dataset(force: bool = False, aa_key: str = None) -> dict:
             "tools": "tools" in params,
             "vision": "image" in (arch.get("input_modalities") or []),
             "reasoning": "reasoning" in params or "include_reasoning" in params,
-            
+
+            # OpenRouter Percentiles
+            "intel_pct": intel_pct,
+            "coding_pct": coding_pct,
+            "agentic_pct": agentic_pct,
+            "avg_pct": avg_pct,
+            "weekly_tokens": weekly_tokens,
+            "providers": providers,
+
             # Benchmarks
-            "coding": None,
-            "intel": None,
-            "agentic": None,
+            "coding": coding_pct,
+            "intel": intel_pct,
+            "agentic": agentic_pct,
             "math": None,
             "livecodebench": None,
             "terminalbench": None,
@@ -489,23 +629,23 @@ def build_dataset(force: bool = False, aa_key: str = None) -> dict:
             "hle": None,
             "ifbench": None,
             "aime": None,
-            
+
             # Latency & Speed
-            "tps": None,
-            "ttft": None,
+            "tps": tps,
+            "ttft": ttft,
             "ttfa": None,
-            "src": "",
+            "src": "OpenRouter / AA",
         }
 
-        # Match benchmark score
+        # Match extra granular benchmark scores from AA raw or seed
         matched = find_matching_benchmark(base, row["name"], aa_index, aliases) if aa_index else []
         if matched:
             best_match = max(matched, key=lambda x: (x.get("coding") or x.get("intel") or 0))
             row.update({
                 "creator": best_match.get("creator") or row["creator"],
-                "coding": best_match.get("coding"),
-                "intel": best_match.get("intel"),
-                "agentic": best_match.get("agentic"),
+                "coding": row["coding"] or best_match.get("coding"),
+                "intel": row["intel"] or best_match.get("intel"),
+                "agentic": row["agentic"] or best_match.get("agentic"),
                 "math": best_match.get("math"),
                 "livecodebench": best_match.get("livecodebench"),
                 "terminalbench": best_match.get("terminalbench"),
@@ -513,34 +653,70 @@ def build_dataset(force: bool = False, aa_key: str = None) -> dict:
                 "hle": best_match.get("hle"),
                 "ifbench": best_match.get("ifbench"),
                 "aime": best_match.get("aime"),
-                "tps": best_match.get("tps"),
-                "ttft": best_match.get("ttft"),
+                "tps": row["tps"] or best_match.get("tps"),
+                "ttft": row["ttft"] or best_match.get("ttft"),
                 "ttfa": best_match.get("ttfa"),
-                "src": "Artificial Analysis",
             })
             c_matched = extract_creator_name(best_match.get("creator") or row["creator"])
             row["creator"] = c_matched
             if c_matched:
                 creators_set.add(c_matched)
         elif base in local_benchmarks and isinstance(local_benchmarks[base], (int, float)):
-            val = float(local_benchmarks[base])
-            row["coding"] = val
-            row["intel"] = val
+            val_override = float(local_benchmarks[base])
+            row["coding"] = row["coding"] or val_override
+            row["intel"] = row["intel"] or val_override
             row["src"] = "benchmarks.json"
         elif base in SEED:
             seed_data = SEED[base]
             if isinstance(seed_data, dict):
-                row["coding"] = seed_data.get("coding")
-                row["intel"] = seed_data.get("intel")
+                row["coding"] = row["coding"] or seed_data.get("coding")
+                row["intel"] = row["intel"] or seed_data.get("intel")
                 row["creator"] = seed_data.get("creator") or row["creator"]
             else:
-                row["coding"] = float(seed_data)
-                row["intel"] = float(seed_data)
-            row["src"] = f"seed {SEED_DATE}"
+                row["coding"] = row["coding"] or float(seed_data)
+                row["intel"] = row["intel"] or float(seed_data)
+
+        # Capability per dollar value formula
+        score_val = row["avg_pct"] if row["avg_pct"] is not None else (row["coding"] or row["intel"])
+        row["value"] = (score_val / blended) if (blended > 0 and score_val and score_val > 0) else 0
 
         rows.append(row)
 
-    scored_count = sum(1 for r in rows if r["coding"] is not None or r["intel"] is not None)
+    scored_count = sum(1 for r in rows if r["coding"] is not None or r["intel"] is not None or r["avg_pct"] is not None)
+
+    # Build OpenRouter Discover Lanes
+    lane_data = {}
+    if or_lanes_raw and isinstance(or_lanes_raw, dict):
+        lane_data = or_lanes_raw
+
+    # Build dynamic OpenRouter Value Leaders (top half qualification: avg_pct >= 50, capability per dollar)
+    qualifying_value = [
+        r for r in rows
+        if (r.get("avg_pct") or 0) >= 50
+        and r.get("blended", 0) > 0
+        and not r.get("free")
+        and "contributor" not in r["id"].lower()
+        and not r["id"].endswith("-latest")
+    ]
+    qualifying_value.sort(key=lambda x: x.get("value", 0), reverse=True)
+    seen_bases = set()
+    computed_value_leaders = []
+    for q in qualifying_value:
+        b_key = q["id"] if ":batch" in q["id"] else q["id"].split(":")[0]
+        if b_key not in seen_bases:
+            seen_bases.add(b_key)
+            computed_value_leaders.append(q)
+
+    # Build dynamic OpenRouter Fastest Models (tps >= 40, providers >= 2)
+    fast_qualifying = [r for r in rows if r.get("tps") and (r.get("tps") >= 40) and ((r.get("providers") or 0) >= 2) and r.get("ttft") and (r.get("ttft") > 0)]
+    fast_qualifying.sort(key=lambda x: x.get("tps", 0), reverse=True)
+    seen_fast = set()
+    computed_fastest = []
+    for f in fast_qualifying:
+        b_key = re.sub(r"-\d{8}$", "", f["id"].split(":")[0])
+        if b_key not in seen_fast and ":batch" not in f["id"]:
+            seen_fast.add(b_key)
+            computed_fastest.append(f)
 
     return {
         "fetched": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -548,10 +724,15 @@ def build_dataset(force: bool = False, aa_key: str = None) -> dict:
         "scored": scored_count,
         "or_age": or_age,
         "aa_age": aa_age,
-        "live_bench": bool(aa_list),
+        "live_bench": bool(aa_list) or bool(pcts_by_slug),
         "creators": sorted(list(creators_set)),
         "warnings": warns,
         "rows": rows,
+        "openrouter_lanes": {
+            "discover_items": lane_data,
+            "value_leaders": computed_value_leaders[:10],
+            "fastest_models": computed_fastest[:10],
+        },
     }
 
 
@@ -605,57 +786,47 @@ class RequestHandler(BaseHTTPRequestHandler):
         pass
 
 
+def format_tokens(n: int) -> str:
+    """Formats large token counts into human readable notation (e.g. 14.1T, 46.6B)."""
+    if not n or n <= 0:
+        return "—"
+    if n >= 1e12:
+        return f"{n / 1e12:.1f}T"
+    if n >= 1e9:
+        return f"{n / 1e9:.1f}B"
+    if n >= 1e6:
+        return f"{n / 1e6:.1f}M"
+    return f"{int(n):,}"
+
+
 def print_terminal_dashboard(data: dict, port: int, max_age_days: int = 90):
-    """Renders a sleek, professional terminal CLI summary of today's best models."""
+    """Renders a sleek, professional terminal CLI summary matching OpenRouter Discover rankings."""
     now_ts = time.time()
     rows = data.get("rows", [])
+    lanes = data.get("openrouter_lanes", {})
 
-    # Filter: scored models released in last 90 days, excluding batch variants by default
+    # OpenRouter Value Leaders & Fastest Models
+    or_value_leaders = lanes.get("value_leaders", [])
+    or_fastest = lanes.get("fastest_models", [])
+
+    # Filtered models for general picks
     filtered = []
     for r in rows:
-        score = r.get("coding") or r.get("intel")
+        score = r.get("avg_pct") or r.get("coding") or r.get("intel")
         if score is None:
             continue
         created = r.get("created")
         age_days = (now_ts - created) / 86400 if created else 9999
         if age_days > max_age_days:
             continue
-        if r.get("variant") == "batch" or r.get("id", "").endswith(":batch"):
-            continue
-        blended = r.get("blended", 0)
-        value = (score * score) / blended if (blended > 0 and not r.get("free")) else (score * score * 1000 if r.get("free") else 0)
-        filtered.append({
-            "id": r.get("id"),
-            "name": r.get("name"),
-            "creator": r.get("creator") or "Unknown",
-            "score": score,
-            "coding": r.get("coding"),
-            "intel": r.get("intel"),
-            "pin": r.get("pin", 0),
-            "pout": r.get("pout", 0),
-            "blended": blended,
-            "free": r.get("free", False),
-            "value": value,
-            "tps": r.get("tps"),
-            "ttft": r.get("ttft"),
-            "ctx": r.get("ctx"),
-        })
+        filtered.append(r)
 
-    # Find Top Picks
-    paid = [r for r in filtered if not r["free"]]
-    best_value = max(paid, key=lambda x: x["value"]) if paid else None
-    
-    budget_models = [r for r in paid if r["blended"] <= 2.5]
-    smartest_budget = max(budget_models, key=lambda x: x["score"]) if budget_models else (max(paid, key=lambda x: x["score"]) if paid else None)
-    
-    speed_models = [r for r in filtered if r["tps"]]
-    fastest = max(speed_models, key=lambda x: x["tps"]) if speed_models else None
-    
-    free_models = [r for r in filtered if r["free"]]
-    best_free = max(free_models, key=lambda x: x["score"]) if free_models else None
+    paid = [r for r in filtered if not r.get("free") and r.get("blended", 0) > 0]
+    free_models = [r for r in filtered if r.get("free")]
 
-    # Top 5 ranked
-    top_5 = sorted(paid, key=lambda x: x["value"], reverse=True)[:5] if paid else []
+    best_free = max(free_models, key=lambda x: (x.get("avg_pct") or x.get("coding") or x.get("intel") or 0)) if free_models else None
+    budget_models = [r for r in paid if r.get("blended", 0) <= 2.5]
+    smartest_budget = max(budget_models, key=lambda x: (x.get("avg_pct") or x.get("coding") or x.get("intel") or 0)) if budget_models else None
 
     # ANSI Colors
     CYAN = "\033[1;36m"
@@ -667,59 +838,95 @@ def print_terminal_dashboard(data: dict, port: int, max_age_days: int = 90):
     RESET = "\033[0m"
     BOLD = "\033[1m"
 
-    box_w = 76
-    t1_plain = "LLMVAL · Developer & LLM Intelligence / Pricing Index"
+    box_w = 78
+    t1_plain = "LLMVAL · OpenRouter Discover & Artificial Analysis Rankings"
     p1 = max(0, box_w - 2 - len(t1_plain))
-    t2_plain = "Created by Hariharen"
+    t2_plain = "Synchronized live with openrouter.ai/discover"
     p2 = max(0, box_w - 2 - len(t2_plain))
 
     print("\n" + f"{CYAN}╔{'═' * box_w}╗{RESET}")
-    print(f"{CYAN}║{RESET}  {BOLD}{WHITE}LLMVAL{RESET} · {YELLOW}Developer & LLM Intelligence / Pricing Index{RESET}{' ' * p1}{CYAN}║{RESET}")
-    print(f"{CYAN}║{RESET}  {GRAY}Created by Hariharen{RESET}{' ' * p2}{CYAN}║{RESET}")
+    print(f"{CYAN}║{RESET}  {BOLD}{WHITE}LLMVAL{RESET} · {YELLOW}OpenRouter Discover & Artificial Analysis Rankings{RESET}{' ' * p1}{CYAN}║{RESET}")
+    print(f"{CYAN}║{RESET}  {GRAY}Synchronized live with openrouter.ai/discover{RESET}{' ' * p2}{CYAN}║{RESET}")
     print(f"{CYAN}╚{'═' * box_w}╝{RESET}")
-    
+
     or_age = data.get("or_age")
     or_str = "live" if or_age is None else (f"{int(or_age/60)}m ago" if or_age < 3600 else f"{round(or_age/3600,1)}h ago")
-    aa_state = "AA live" if data.get("live_bench") else "seed snapshot"
-    
-    print(f" {GRAY}Feeds:{RESET} OpenRouter ({or_str}) · {aa_state} · {GRAY}Window:{RESET} Last {max_age_days} days · {GRAY}Tracked:{RESET} {data.get('total', 0)} models ({data.get('scored', 0)} scored)")
-    print(f" {GRAY}Web UI:{RESET} {GREEN}http://localhost:{port}{RESET}  {GRAY}(Interactive Leaderboard, Compare & Calculator){RESET}\n")
 
-    print(f" {BOLD}{WHITE}TODAY'S RECOMMENDED PICKS (LAST {max_age_days} DAYS):{RESET}")
-    print(f" ─" * 40)
-    
-    if best_value:
-        b_price = f"${best_value['blended']:.2f}/1M" if best_value['blended'] >= 0.05 else f"${best_value['blended']:.3f}/1M"
-        print(f"  {YELLOW}🏆 BEST VALUE PICK{RESET}       : {BOLD}{WHITE}{best_value['name']}{RESET} ({best_value['creator']})")
-        print(f"     {GRAY}Score:{RESET} {GREEN}{best_value['score']:.1f}{RESET}  {GRAY}Blended:{RESET} {b_price}  {GRAY}Value Index:{RESET} {BOLD}{int(best_value['value']):,}{RESET}")
+    print(f" {GRAY}Feeds:{RESET} OpenRouter Discover ({or_str}) · {GRAY}Price Weight:{RESET} 75% In / 25% Out · {GRAY}Tracked:{RESET} {data.get('total', 0)} models")
+    print(f" {GRAY}Web UI:{RESET} {GREEN}http://localhost:{port}{RESET}  {GRAY}(Interactive Leaderboard, Discover Lanes & Calculator){RESET}\n")
 
+    # 1. VALUE LEADERS LANE (EXACT OPENROUTER DISCOVER)
+    print(f" {BOLD}{WHITE}VALUE LEADERS{RESET}  {GRAY}(The most capability per dollar of list price · Top half qualifying){RESET}")
+    print(f"  {GRAY}#   {'Model':<30} {'Coding':<8} {'Agentic':<9} {'Tokens':<9} {'Blended $/1M':<14} {'Value'}{RESET}")
+    print(f"  {GRAY}──────────────────────────────────────────────────────────────────────────────{RESET}")
+    
+    # Check discover lane items first or computed
+    disc_items = lanes.get("discover_items", {}).get("value_leaders", [])
+    display_value_leaders = []
+    
+    if disc_items:
+        for it in disc_items:
+            slug = it.get("item", "").replace("https://openrouter.ai/", "")
+            row_match = next((r for r in rows if r["id"] == slug or r["id"].split(":")[0] == slug), None)
+            if row_match:
+                display_value_leaders.append(row_match)
+            else:
+                display_value_leaders.append({
+                    "name": it.get("name"),
+                    "coding_pct": None,
+                    "agentic_pct": None,
+                    "weekly_tokens": 0,
+                    "blended": 0,
+                    "value": 0,
+                })
+    if not display_value_leaders:
+        display_value_leaders = or_value_leaders[:5]
+
+    for idx, m in enumerate(display_value_leaders[:5], 1):
+        name_disp = m["name"][:28] + ".." if len(m["name"]) > 30 else m["name"]
+        c_pct = f"{m['coding_pct']}%" if m.get("coding_pct") is not None else "—"
+        a_pct = f"{m['agentic_pct']}%" if m.get("agentic_pct") is not None else "—"
+        tok_str = format_tokens(m.get("weekly_tokens", 0))
+        price_str = f"${m['blended']:.3f}" if m.get("blended") else "—"
+        val_str = f"{m['value']:.1f}" if m.get("value") else "—"
+        print(f"  {YELLOW if idx==1 else WHITE}{idx:<3}{RESET} {BOLD}{name_disp:<30}{RESET} {CYAN}{c_pct:<8}{RESET} {MAGENTA}{a_pct:<9}{RESET} {GRAY}{tok_str:<9}{RESET} {WHITE}{price_str:<14}{RESET} {GREEN}{val_str}{RESET}")
+
+    print(f"\n {BOLD}{WHITE}FASTEST MODELS{RESET}  {GRAY}(Highest median output speed across multiple providers){RESET}")
+    print(f"  {GRAY}#   {'Model':<30} {'Throughput':<14} {'TTFT p50':<12} {'Providers'}{RESET}")
+    print(f"  {GRAY}──────────────────────────────────────────────────────────────────────────────{RESET}")
+    
+    disc_fast_items = lanes.get("discover_items", {}).get("fastest_models", [])
+    display_fastest = []
+    if disc_fast_items:
+        for it in disc_fast_items:
+            slug = it.get("item", "").replace("https://openrouter.ai/", "")
+            row_match = next((r for r in rows if r["id"] == slug or r["id"].split(":")[0] == slug), None)
+            if row_match and row_match.get("tps"):
+                display_fastest.append(row_match)
+            else:
+                display_fastest.append({"name": it.get("name"), "tps": 0, "ttft": 0, "providers": 0})
+    if not display_fastest:
+        display_fastest = or_fastest[:5]
+
+    for idx, m in enumerate(display_fastest[:5], 1):
+        name_disp = m["name"][:28] + ".." if len(m["name"]) > 30 else m["name"]
+        tps_str = f"{int(m['tps'])} tok/s" if m.get("tps") else "—"
+        ttft_str = f"{int(m['ttft'] * 1000)}ms" if m.get("ttft") else "—"
+        prov_str = f"{m['providers']} providers" if m.get("providers") else "—"
+        print(f"  {CYAN if idx==1 else WHITE}{idx:<3}{RESET} {BOLD}{name_disp:<30}{RESET} {GREEN}{tps_str:<14}{RESET} {GRAY}{ttft_str:<12}{RESET} {WHITE}{prov_str}{RESET}")
+
+    print(f"\n {BOLD}{WHITE}CURATED HIGHLIGHTS:{RESET}")
+    print(f" ─" * 39)
     if smartest_budget:
-        s_price = f"${smartest_budget['blended']:.2f}/1M" if smartest_budget['blended'] >= 0.05 else f"${smartest_budget['blended']:.3f}/1M"
+        s_price = f"${smartest_budget['blended']:.3f}/1M" if smartest_budget['blended'] < 0.1 else f"${smartest_budget['blended']:.2f}/1M"
+        sc_val = smartest_budget.get("avg_pct") or smartest_budget.get("coding") or smartest_budget.get("intel")
         print(f"  {MAGENTA}🧠 SMARTEST IN BUDGET (<$2.50){RESET}: {BOLD}{WHITE}{smartest_budget['name']}{RESET} ({smartest_budget['creator']})")
-        print(f"     {GRAY}Score:{RESET} {GREEN}{smartest_budget['score']:.1f}{RESET}  {GRAY}Blended:{RESET} {s_price}")
-
-    if fastest:
-        ttft_str = f"{fastest['ttft']:.2f}s" if fastest.get("ttft") else "—"
-        print(f"  {CYAN}⚡ FASTEST GENERATION{RESET}    : {BOLD}{WHITE}{fastest['name']}{RESET}")
-        print(f"     {GRAY}Throughput:{RESET} {GREEN}{int(fastest['tps'])} tok/s{RESET}  {GRAY}TTFT:{RESET} {ttft_str}")
-
+        print(f"     {GRAY}Score/Percentile:{RESET} {GREEN}{sc_val:.1f}{RESET}  {GRAY}Blended:{RESET} {s_price}")
     if best_free:
+        f_val = best_free.get("avg_pct") or best_free.get("coding") or best_free.get("intel") or 0
         print(f"  {GREEN}🎁 BEST FREE MODEL{RESET}       : {BOLD}{WHITE}{best_free['name']}{RESET}")
-        print(f"     {GRAY}Score:{RESET} {GREEN}{best_free['score']:.1f}{RESET}  {GRAY}Price:{RESET} Free ($0.00)")
-
-    print(f" ─" * 40)
-    
-    if top_5:
-        print(f"\n {BOLD}{WHITE}TOP 5 VALUE LEADERBOARD:{RESET}")
-        header = f"  {GRAY}#   {'Model':<34} {'Lab':<14} {'Score':<7} {'Blended':<10} {'Value':<8}{RESET}"
-        print(header)
-        print(f"  {GRAY}────────────────────────────────────────────────────────────────────────────{RESET}")
-        for idx, m in enumerate(top_5, 1):
-            name_disp = m['name'][:32] + ".." if len(m['name']) > 34 else m['name']
-            lab_disp = m['creator'][:12] + ".." if len(m['creator']) > 14 else m['creator']
-            price_disp = f"${m['blended']:.2f}" if m['blended'] >= 0.05 else f"${m['blended']:.3f}"
-            val_disp = f"{int(m['value']):,}"
-            print(f"  {YELLOW if idx==1 else WHITE}{idx:<3}{RESET} {name_disp:<34} {GRAY}{lab_disp:<14}{RESET} {GREEN}{m['score']:<7.1f}{RESET} {WHITE}{price_disp:<10}{RESET} {BOLD}{val_disp:<8}{RESET}")
+        print(f"     {GRAY}Score/Percentile:{RESET} {GREEN}{f_val:.1f}{RESET}  {GRAY}Price:{RESET} Free ($0.00)")
+    print(f" ─" * 39)
 
     print(f"\n {GRAY}Press {WHITE}Ctrl+C{GRAY} in terminal to shutdown.{RESET}\n")
 
