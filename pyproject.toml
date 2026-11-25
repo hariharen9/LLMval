@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
 authors = [
-    { name = "Hariharen", email = "contact@hariharen.site" }
+    { name = "Hariharen", email = "contact@hariharen.space" }
 ]
 keywords = ["llm", "openrouter", "artificial-analysis", "benchmarks", "coding", "pricing", "dashboard"]
 classifiers = [
@@ -22,8 +22,8 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://hariharen.site"
-"Creator Website" = "https://hariharen.site"
+Homepage = "https://hariharen.space"
+"Creator Website" = "https://hariharen.space"
 
 [project.scripts]
 llmval = "llmval.app:main"

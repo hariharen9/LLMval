@@ -4,7 +4,7 @@ setup(
     name="llmval",
     version="1.0.2",
     author="Hariharen",
-    url="https://hariharen.site",
+    url="https://hariharen.space",
     packages=find_packages(),
     package_data={
         "llmval": ["web/*", "web/**/*", "data/*", "data/**/*"],
